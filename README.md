@@ -1,18 +1,18 @@
-# Squeektoshi Radio 🐹📻
+# Squeektoshi-radio 🐹📻
 
-> **Hamster-Powered Generative Music Station on Squeekchain Telemetry**  
+> **Hamster-Powered Generative Music Station on Squeekchain PoW Telemetry**  
 > Built for the Squeekchain *Genesis Code Lane* builder campaign.
 
 Squeektoshi Radio turns the live WHEELY9000 hamster wheel into a continuous, generative music station running entirely inside the browser. As Squeektoshi runs on his wheel, the physical proof-of-work telemetry settles on the Sepolia Ethereum testnet. Squeektoshi Radio synthesizes this telemetry into an evolving soundscape: his wheel speed drives the tempo, his sleep turns the music into an ambient lullaby, completing blocks modulates the harmony, and every settlement rings a celebratory bell. Holders can enter their public wallet address to have their Squeek NFTs join the band as synthesized instruments.
 
 ---
 
-## Key Features
+## 🌟 Key Features
 
 1. **100% Web Audio Synthesis (Zero Audio Files)**
    - All sounds (kick drums, high-pass noise hi-hats, triangle plucks, detuned pads, inharmonic FM bells, vibrato leads, and marimbas) are synthesized directly with the browser's native Web Audio API.
    - Built-in algorithmic stereo reverb convolver generated from pure noise envelopes.
-   - Safety audio ceiling: dynamics compressor + master gain hard ceiling at $\le 0.8$.
+   - Hearing safety: dynamics compressor + master gain hard ceiling at $\le 0.8$.
 
 2. **Serverless Shared Listening**
    - Note selection and arpeggio permutations are evaluated using a deterministic Mulberry32 PRNG seeded by `(blockHeight, Math.floor(Date.now() / stepMs))`.
@@ -54,12 +54,13 @@ Squeektoshi Radio turns the live WHEELY9000 hamster wheel into a continuous, gen
    - Dark theme `#1a1a20`, Hamster gold `#f2b84b`, Squeek blue `#5b8cff`, dot-grid background.
    - Full keyboard navigation and high-contrast visible focus rings.
    - Dynamic `aria-live="polite"` regions for mood updates and signal status alerts.
+   - Keyboard shortcuts: `Space` (Toggle Tune In/Out), `M` (Toggle Mute).
    - Responsive layout functioning down to 360px mobile viewports.
    - Transparent "How It Works" panel citing the sensor boundaries documented in [What the system proves](https://docs.squeekchain.com/security/proof-limits/).
 
 ---
 
-## Musical Telemetry Mapping Reference
+## 🎵 Musical Telemetry Mapping Reference
 
 | Telemetry Input | Musical Dimension | Mapping Logic |
 |---|---|---|
@@ -72,7 +73,7 @@ Squeektoshi Radio turns the live WHEELY9000 hamster wheel into a continuous, gen
 
 ---
 
-## Running Locally
+## 🚀 Running Locally
 
 Squeektoshi Radio has **zero runtime dependencies** and requires **no build step**. It runs as vanilla HTML5, CSS3, and ES modules.
 
@@ -98,15 +99,15 @@ Open your browser to:
 
 ---
 
-## Testing & Verification
+## 🧪 Testing & Verification
 
 The test suite includes pure mapping tests, replay determinism tests, API parsing tests, and Playwright end-to-end tests:
 
 ```bash
-# Run all unit tests (Node.js native test runner)
+# Run all unit tests (Node.js native test runner - 21 tests)
 npm run test:unit
 
-# Run Playwright end-to-end tests (mocked & live routes)
+# Run Playwright end-to-end tests (mocked & live routes - 4 tests)
 npm run test:e2e
 
 # Generate the 1200x630 social card
@@ -115,7 +116,7 @@ npm run card
 
 ---
 
-## Adding to OBS Studio as a Stream Overlay
+## 📺 Adding to OBS Studio as a Stream Overlay
 
 1. In OBS Studio, add a new source: **Browser**.
 2. Set the URL to your deployed URL or `http://localhost:3000/?overlay=1`.
@@ -125,7 +126,7 @@ npm run card
 
 ---
 
-## Deploying to Production
+## 🌐 Deploying to Production
 
 Because Squeektoshi Radio is a static site with no build requirements, deployment is instant on any static host:
 
@@ -143,7 +144,56 @@ Because Squeektoshi Radio is a static site with no build requirements, deploymen
 
 ---
 
-## License
+## ⚡ Converting to Next.js + TypeScript + Tailwind CSS
+
+Yes, you can convert this project to **Next.js (App Router), TypeScript, and Tailwind CSS**!
+
+### Important Campaign Rule Check:
+> *The original Genesis Code Lane master prompt requested a zero-build static site with no mandatory bundler.*
+> If you convert the project to Next.js for your own fork or portfolio, use Next.js Static Export (`output: 'export'`) so it still builds into pure static HTML/CSS/JS without requiring a Node.js server.
+
+### Conversion Blueprint:
+
+1. **Pure Music Engine (`src/music/*.ts`)**:
+   - `mapping.ts`, `prng.ts`, `voices.ts`, `scheduler.ts`, and `replay.ts` are 100% pure JavaScript/TypeScript. They copy directly into Next.js with complete type definitions (`interface StatusData`, `interface Bucket`, `type Mood = 'sleep' | 'jog' | 'zoomies' | 'unknown'`).
+2. **Audio & Window SSR Guard (`'use client'`)**:
+   - Web Audio (`AudioContext`) only exists in the browser. In Next.js, add `'use client';` at the top of all audio-related components and initialize inside a `useEffect`:
+   ```tsx
+   'use client';
+   import { useEffect, useRef } from 'react';
+   import { AudioEngine } from '@/music/engine';
+
+   export function Player() {
+     const engineRef = useRef<AudioEngine | null>(null);
+     useEffect(() => {
+       engineRef.current = new AudioEngine();
+     }, []);
+     return <button onClick={() => engineRef.current?.start()}>Tune In</button>;
+   }
+   ```
+3. **Tailwind CSS (`tailwind.config.js`)**:
+   - Replace `styles.css` custom properties with Tailwind theme extensions:
+   ```javascript
+   module.exports = {
+     theme: {
+       extend: {
+         colors: {
+           brand: {
+             bg: '#121217',
+             surface: '#1a1a22',
+             gold: '#f2b84b',
+             blue: '#5b8cff',
+           }
+         }
+       }
+     }
+   }
+   ```
+4. **Canvas Visualizer (`Visualizer.tsx`)**:
+   - Bind canvas refs with `useRef<HTMLCanvasElement>(null)` and attach `VisualizerManager` inside `useEffect()`.
+
+---
+
+## 📄 License
 
 MIT License. Built with ❤️ for the Squeekchain Community.
-
