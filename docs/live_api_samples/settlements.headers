@@ -1,0 +1,18 @@
+HTTP/2 200 
+date: Fri, 06 Nov 2026 17:14:04 GMT
+content-type: application/json
+content-length: 16659
+access-control-allow-origin: *
+access-control-expose-headers: ETag,X-Squeek-Settlement-Source,X-Squeek-Settlement-Fallback-Reason,Retry-After,X-Request-Id
+cache-control: public, max-age=0, s-maxage=60, must-revalidate
+etag: "65c0ed73fce58de4c1c62c3f70ce9f216af011016bf6c545359e6f18ce1871ed"
+x-request-id: db67c238-1b55-4962-8c5c-384397cb10a9
+x-squeek-settlement-source: live
+accept-ranges: bytes
+cf-cache-status: MISS
+nel: {"report_to":"cf-nel","success_fraction":0.0,"max_age":604800}
+report-to: {"group":"cf-nel","max_age":604800,"endpoints":[{"url":"https://a.nel.cloudflare.com/report/v4?s=0N9gOjeHjjQdE%2FBQJR0i5S3eSrCpS5wOLE1n92Hw66c3E%2Fal6yysEEBBhytNMAXA6lo6iQEvdJ4%2BLUzDSQTjHFHlr4BosLRNTxjgl6lbQYZtKzV0rA3FaI%2Bwir8WsOuWR1%2BoAPLP"}]}
+server: cloudflare
+cf-ray: a565bb7f0b6cadfb-DAC
+alt-svc: h3=":443"; ma=86400
+

@@ -1,0 +1,729 @@
+/* ==========================================================================
+   Squeektoshi Radio - Stylesheet
+   Brand Colors: Dark #1a1a20, Gold #f2b84b, Blue #5b8cff, Red #ff5b5b
+   ========================================================================== */
+
+:root {
+  --bg-primary: #121217;
+  --bg-surface: #1a1a22;
+  --bg-surface-elevated: #242430;
+  --bg-surface-translucent: rgba(26, 26, 34, 0.85);
+  
+  --border-subtle: #2e2e3d;
+  --border-focus: #5b8cff;
+  
+  --text-primary: #f0f0f5;
+  --text-secondary: #9e9eb4;
+  --text-muted: #6a6a80;
+  
+  --gold-primary: #f2b84b;
+  --gold-glow: rgba(242, 184, 75, 0.25);
+  --blue-primary: #5b8cff;
+  --blue-glow: rgba(91, 140, 255, 0.25);
+  --green-online: #34d399;
+  --red-alert: #f87171;
+  
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-full: 9999px;
+  
+  --transition-fast: 150ms ease;
+  --transition-normal: 250ms ease;
+}
+
+/* Reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  line-height: 1.5;
+  min-height: 100vh;
+  position: relative;
+  overflow-x: hidden;
+  
+  /* Squeekchain signature dot-grid */
+  background-image: radial-gradient(var(--border-subtle) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* Accessible focus styling */
+:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 3px;
+}
+
+/* Main Container Layout */
+.app-container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 3rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+}
+
+/* Header & Station Brand */
+.station-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.brand-title-group {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.brand-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, var(--gold-primary), #d99b26);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  box-shadow: 0 0 16px var(--gold-glow);
+}
+
+.brand-name {
+  font-size: 1.4rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+
+.brand-name span {
+  color: var(--gold-primary);
+}
+
+.header-status-strip {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.freshness-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0.65rem;
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-family: var(--font-mono);
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+}
+
+.freshness-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--green-online);
+  box-shadow: 0 0 8px rgba(52, 211, 153, 0.5);
+}
+
+.freshness-dot.stale, .freshness-dot.unavailable {
+  background: var(--red-alert);
+  box-shadow: 0 0 8px rgba(248, 113, 113, 0.5);
+}
+
+/* Offline / Signal Lost Banner */
+.status-banner {
+  display: none;
+  background: rgba(248, 113, 113, 0.12);
+  border: 1px solid rgba(248, 113, 113, 0.3);
+  color: var(--red-alert);
+  padding: 0.65rem 1rem;
+  border-radius: var(--radius-md);
+  font-size: 0.85rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.status-banner.visible {
+  display: flex;
+}
+
+/* Master Control & Primary Visualizer Grid */
+.station-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+}
+
+@media (min-width: 800px) {
+  .station-grid {
+    grid-template-columns: 380px 1fr;
+  }
+}
+
+/* Left Column: Radio Tuner Panel */
+.radio-panel {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  backdrop-filter: blur(8px);
+}
+
+.tune-button {
+  width: 100%;
+  padding: 0.9rem 1.5rem;
+  font-size: 1.1rem;
+  font-weight: 700;
+  border: none;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, var(--gold-primary), #df9b20);
+  color: #121216;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+  box-shadow: 0 4px 18px var(--gold-glow);
+}
+
+.tune-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 24px rgba(242, 184, 75, 0.4);
+}
+
+.tune-button:active {
+  transform: translateY(1px);
+}
+
+.tune-button.playing {
+  background: var(--bg-surface-elevated);
+  color: var(--gold-primary);
+  border: 1px solid var(--gold-primary);
+  box-shadow: none;
+}
+
+.audio-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.25rem;
+}
+
+.mute-btn {
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  border-radius: var(--radius-sm);
+  padding: 0.4rem 0.6rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.volume-slider {
+  flex: 1;
+  accent-color: var(--gold-primary);
+  cursor: pointer;
+}
+
+/* Station Telemetry Badges */
+.telemetry-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.telemetry-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  background: var(--bg-surface-elevated);
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+}
+
+.telemetry-label {
+  color: var(--text-secondary);
+}
+
+.telemetry-value {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.telemetry-value.gold {
+  color: var(--gold-primary);
+}
+
+.telemetry-value.blue {
+  color: var(--blue-primary);
+}
+
+.mood-badge {
+  display: inline-block;
+  padding: 0.2rem 0.5rem;
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.mood-badge.sleep {
+  background: rgba(91, 140, 255, 0.15);
+  color: var(--blue-primary);
+  border: 1px solid rgba(91, 140, 255, 0.3);
+}
+
+.mood-badge.jog {
+  background: rgba(52, 211, 153, 0.15);
+  color: var(--green-online);
+  border: 1px solid rgba(52, 211, 153, 0.3);
+}
+
+.mood-badge.zoomies {
+  background: rgba(242, 184, 75, 0.15);
+  color: var(--gold-primary);
+  border: 1px solid rgba(242, 184, 75, 0.3);
+  animation: pulse-zoomies 2s infinite ease-in-out;
+}
+
+.mood-badge.unknown {
+  background: rgba(158, 158, 180, 0.15);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-subtle);
+}
+
+@keyframes pulse-zoomies {
+  0%, 100% { box-shadow: 0 0 0 rgba(242, 184, 75, 0); }
+  50% { box-shadow: 0 0 12px rgba(242, 184, 75, 0.4); }
+}
+
+/* Block Progress Meter */
+.progress-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.progress-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.progress-bar-track {
+  width: 100%;
+  height: 8px;
+  background: var(--bg-surface-elevated);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  position: relative;
+  border: 1px solid var(--border-subtle);
+}
+
+.progress-bar-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--blue-primary), var(--gold-primary));
+  transition: width 0.4s ease-out;
+}
+
+/* Right Column: Visualizer Stage */
+.visualizer-stage {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  position: relative;
+  min-height: 400px;
+}
+
+.visualizer-canvases {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.25rem;
+  flex: 1;
+}
+
+@media (min-width: 600px) {
+  .visualizer-canvases {
+    grid-template-columns: 240px 1fr;
+  }
+}
+
+.canvas-card {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.canvas-title {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.75rem;
+  font-size: 0.7rem;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+canvas#wheel-canvas {
+  width: 200px;
+  height: 200px;
+}
+
+canvas#scope-canvas {
+  width: 100%;
+  height: 200px;
+}
+
+/* Mode Tabs: Live Station vs 24h Replay */
+.station-modes {
+  display: flex;
+  gap: 0.5rem;
+  border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: 0.5rem;
+}
+
+.mode-tab-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-weight: 600;
+  font-size: 0.95rem;
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: color var(--transition-fast), background var(--transition-fast);
+}
+
+.mode-tab-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-surface-elevated);
+}
+
+.mode-tab-btn.active {
+  color: var(--gold-primary);
+  background: rgba(242, 184, 75, 0.12);
+}
+
+/* Replay The Day Section (F2) */
+.replay-panel {
+  display: none;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.replay-panel.active {
+  display: flex;
+}
+
+.timeline-scrubber {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.timeline-buckets {
+  display: grid;
+  grid-template-columns: repeat(24, 1fr);
+  gap: 2px;
+  height: 36px;
+  background: var(--bg-primary);
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+}
+
+.bucket-bar {
+  background: var(--bg-surface-elevated);
+  border-radius: 2px;
+  transition: background var(--transition-fast);
+  cursor: pointer;
+}
+
+.bucket-bar.sleep { background: rgba(91, 140, 255, 0.4); }
+.bucket-bar.jog { background: rgba(52, 211, 153, 0.4); }
+.bucket-bar.zoomies { background: rgba(242, 184, 75, 0.6); }
+.bucket-bar.active-hour {
+  outline: 2px solid #ffffff;
+  z-index: 2;
+}
+
+/* Squeek Band Section (F3) */
+.band-section {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.band-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.band-title-group h2 {
+  font-size: 1.2rem;
+  color: var(--text-primary);
+}
+
+.band-title-group p {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.wallet-form {
+  display: flex;
+  gap: 0.5rem;
+  width: 100%;
+  max-width: 520px;
+}
+
+.wallet-input {
+  flex: 1;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  padding: 0.6rem 0.85rem;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+}
+
+.wallet-input:focus {
+  border-color: var(--border-focus);
+}
+
+.btn-secondary {
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  padding: 0.6rem 1rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.btn-secondary:hover {
+  background: #2f2f3d;
+}
+
+.band-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 1rem;
+}
+
+.squeek-card {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  text-align: center;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast);
+}
+
+.squeek-card.playing {
+  border-color: var(--gold-primary);
+  box-shadow: 0 0 16px var(--gold-glow);
+  transform: translateY(-2px);
+}
+
+.squeek-avatar {
+  width: 72px;
+  height: 72px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface-elevated);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.squeek-avatar img, .squeek-avatar svg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.squeek-id {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.squeek-voice {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+}
+
+.squeek-power {
+  font-size: 0.65rem;
+  font-family: var(--font-mono);
+  color: var(--gold-primary);
+}
+
+/* How It Works & Proof Limits Panel */
+.info-section {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.info-section h3 {
+  color: var(--text-primary);
+  font-size: 1rem;
+}
+
+.info-section a {
+  color: var(--blue-primary);
+  text-decoration: none;
+}
+
+.info-section a:hover {
+  text-decoration: underline;
+}
+
+/* ==========================================================================
+   OBS / Stream Overlay Mode (?overlay=1)
+   ========================================================================== */
+body.overlay-mode {
+  background: transparent !important;
+  background-image: none !important;
+  min-height: auto;
+  overflow: hidden;
+}
+
+body.chroma-mode {
+  background: #00ff00 !important; /* Pure green for chroma keying */
+  background-image: none !important;
+}
+
+body.overlay-mode .app-container {
+  max-width: 100%;
+  padding: 0;
+  margin: 0;
+}
+
+body.overlay-mode .station-header,
+body.overlay-mode .radio-panel,
+body.overlay-mode .station-modes,
+body.overlay-mode .replay-panel,
+body.overlay-mode .band-section,
+body.overlay-mode .info-section,
+body.overlay-mode .status-banner {
+  display: none !important;
+}
+
+.overlay-container {
+  display: none;
+}
+
+body.overlay-mode .overlay-container {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  background: rgba(18, 18, 23, 0.85);
+  border: 1px solid rgba(242, 184, 75, 0.3);
+  padding: 0.75rem 1.25rem;
+  border-radius: var(--radius-lg);
+  backdrop-filter: blur(8px);
+  width: fit-content;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.overlay-wheel {
+  width: 60px;
+  height: 60px;
+}
+
+.overlay-stats {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.overlay-stat-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.overlay-stat-label {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.overlay-stat-value {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+}
+

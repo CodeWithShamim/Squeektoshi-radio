@@ -1,0 +1,25 @@
+{
+  "name": "squeektoshi-radio",
+  "version": "1.0.0",
+  "description": "Hamster-powered generative music station running entirely in the browser on Squeekchain PoW telemetry",
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "test:unit": "node --test tests/mapping.test.js tests/replay.test.js tests/api.test.js",
+    "test:e2e": "npx playwright test",
+    "start": "node server.js",
+    "card": "node tools/make-card.js"
+  },
+  "keywords": [
+    "squeekchain",
+    "web-audio",
+    "generative-music",
+    "proof-of-work",
+    "hamster"
+  ],
+  "author": "Squeektoshi Radio Team",
+  "license": "MIT",
+  "devDependencies": {
+    "@playwright/test": "^1.65.0"
+  }
+}
