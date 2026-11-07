@@ -18,6 +18,7 @@
   <link rel="stylesheet" href="tokens.css">
   <link rel="stylesheet" href="app.css">
   <link rel="stylesheet" href="console.css">
+  <link rel="stylesheet" href="share.css">
 </head>
 <body class="app-body">
   <!-- Full-bleed Background Oscilloscope Canvas -->
@@ -57,6 +58,8 @@
     <div class="header-right">
       <button id="btn-header-demo" class="btn-console-highlight btn-demo-try" aria-label="Demo Try" style="display: none;">Demo Try</button>
       <button id="btn-header-live" class="btn-console-secondary btn-header-live" aria-label="Live" style="display: none;">Live</button>
+      <button id="btn-header-best-hour" class="btn-console-secondary btn-header-best-hour" aria-label="Best hour">Best hour</button>
+      <button id="btn-header-share" class="btn-console-secondary btn-header-share" aria-label="Share">Share</button>
       <button id="btn-header-console" class="btn-console-secondary btn-header-console" aria-expanded="false" title="Open Console Settings (C)" aria-label="Console">Console</button>
       <button id="btn-toggle-cues" class="btn-console-secondary btn-cue-toggle" aria-pressed="true" aria-label="CUES ON">CUES ON</button>
       <div id="signal-badge" class="header-signal" aria-live="polite">
@@ -117,6 +120,23 @@
 
     <!-- Center Stage (Cols 4 - 9): The Central Dial -->
     <section class="dial-stage-center" aria-label="Central Instrument Dial">
+      <!-- Best Hour Excerpt Floating HUD -->
+      <div id="best-hour-hud" class="best-hour-hud" style="display: none;" role="region" aria-label="Best Hour Excerpt Player">
+        <div class="best-hour-hud-pill">
+          <span class="best-hour-hud-badge">BEST HOUR</span>
+          <span id="best-hour-hud-rank" class="best-hour-hud-val">1 of 24</span>
+          <span class="hud-sep">/</span>
+          <span id="best-hour-hud-time" class="best-hour-hud-val">--:--</span>
+          <span class="hud-sep">/</span>
+          <span id="best-hour-hud-utc" class="best-hour-hud-dim">--:-- UTC</span>
+          <span class="hud-sep">/</span>
+          <span id="best-hour-hud-work" class="best-hour-hud-val">0 passes</span>
+          <span class="hud-sep">/</span>
+          <span id="best-hour-hud-blocks" class="best-hour-hud-val">0 blocks</span>
+          <button id="btn-best-hour-hud-close" class="best-hour-hud-close" aria-label="Return to live station">✕ Live</button>
+        </div>
+      </div>
+
       <div class="dial-wrapper" id="dial-wrapper">
         <!-- SVG Dial Structure (36 Magnets, Sensor Gate, Gauge, Hour Ring, Band Orbit) -->
         <svg id="dial-svg" class="dial-svg" viewBox="0 0 600 600" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -250,10 +270,13 @@
       </div>
 
       <!-- Tune In / Mute Button with Hardware Tally Lamp -->
-      <button id="tune-btn" class="btn-console-primary" aria-pressed="false">
-        <span class="tally-led" aria-hidden="true"></span>
-        <span id="tune-text">Tune in</span>
-      </button>
+      <div class="tune-button-wrapper" style="display: flex; flex-direction: column; gap: 4px;">
+        <button id="tune-btn" class="btn-console-primary" aria-pressed="false">
+          <span class="tally-led" aria-hidden="true"></span>
+          <span id="tune-text">Tune in</span>
+        </button>
+        <span id="first-visit-hint" class="first-visit-hint" style="display: none; font-size: 0.68rem; color: var(--color-bone-muted); letter-spacing: 0.02em;">Hear the busiest hour of the last day.</span>
+      </div>
 
       <!-- Real-Time Hardware LED VU / Peak Meter -->
       <div class="audio-vu-meter-container" aria-label="Stereo Audio Level Meter" title="Real-time Audio VU Peak Meter (dBFS)">
@@ -291,7 +314,9 @@
     </div>
 
     <div class="controls-right">
-      <!-- Mode Triggers -->
+      <!-- Mode & Feature Triggers -->
+      <button id="btn-best-hour" class="btn-console-secondary" title="Play Best Hour (H)" aria-label="Best hour">Best hour</button>
+      <button id="btn-share-band" class="btn-console-secondary" title="Share Band Poster (S)" aria-label="Share band">Share</button>
       <button id="tab-replay" class="btn-console-secondary" aria-expanded="false">Replay day</button>
       <button id="tab-band" class="btn-console-secondary" aria-expanded="false">Band</button>
       <button id="tab-live" class="btn-console-secondary" style="display: none;" aria-label="Live">Live</button>
@@ -301,6 +326,8 @@
       <!-- Keyboard Shortcut Hints -->
       <div class="keyboard-hints" aria-hidden="true">
         <span><kbd class="kbd-tag">Space</kbd> Tune/Mute</span>
+        <span><kbd class="kbd-tag">H</kbd> Best hour</span>
+        <span><kbd class="kbd-tag">S</kbd> Share</span>
         <span><kbd class="kbd-tag">C</kbd> Console</span>
         <span><kbd class="kbd-tag">D</kbd> Diag</span>
         <span><kbd class="kbd-tag">R</kbd> Replay</span>
@@ -343,6 +370,20 @@
           <button role="tab" class="segment-btn" data-mode="orchestra" aria-selected="false">Orchestra</button>
         </div>
         <p class="console-section-desc" id="mode-desc-text">Live telemetry from the WHEELY9000 hamster wheel on Sepolia.</p>
+      </section>
+
+      <!-- 2. Best Hour Controller -->
+      <section class="console-section" id="console-best-hour-section">
+        <label class="console-section-label">BEST HOUR (LAST 24H EXCERPT)</label>
+        <div id="console-best-hour-details" class="spotlight-box">
+          <div class="spotlight-row"><span>RANK</span> <strong id="best-hour-rank">1 of 24</strong></div>
+          <div class="spotlight-row"><span>PASSES (WORK)</span> <strong id="best-hour-work">--</strong></div>
+          <div class="spotlight-row"><span>BLOCKS</span> <strong id="best-hour-blocks">--</strong></div>
+          <div class="spotlight-row"><span>LOCAL TIME</span> <strong id="best-hour-localtime">--</strong></div>
+          <div class="spotlight-row"><span>UTC TIME</span> <strong id="best-hour-utctime">--</strong></div>
+        </div>
+        <div id="best-hour-reason-msg" class="drawer-status-msg" style="display: none; color: var(--color-amber);"></div>
+        <button id="btn-console-best-hour" class="btn-console-secondary" style="margin-top: 0.5rem;" aria-label="Play Best Hour Excerpt">▶ Play Best Hour Excerpt</button>
       </section>
 
       <!-- 2. Synthesized Sound Palettes -->
@@ -479,6 +520,74 @@
           <li class="diag-log-item"><span>--:--:--</span> <span>No requests logged yet</span></li>
         </ul>
       </section>
+    </div>
+  </aside>
+
+  <!-- Share Band & Wheel Poster Dialog Modal (Feature 1) -->
+  <aside id="share-modal" class="share-modal" role="dialog" aria-modal="true" aria-labelledby="share-modal-title" aria-hidden="true">
+    <div class="share-modal-backdrop" id="share-modal-backdrop"></div>
+    <div class="share-modal-content">
+      <div class="share-modal-header">
+        <h2 id="share-modal-title" class="console-title">SHARE YOUR BAND // POSTER</h2>
+        <button id="share-modal-close" class="drawer-close-btn" aria-label="Close share dialog">CLOSE [ESC]</button>
+      </div>
+
+      <div class="share-modal-body">
+        <!-- Live Preview Container -->
+        <div class="share-preview-pane">
+          <div class="share-canvas-container" id="share-canvas-container">
+            <canvas id="poster-canvas" class="poster-preview-canvas" width="1200" height="630" aria-label="Band and dial poster preview"></canvas>
+          </div>
+          <div id="share-status-announcer" class="share-status-announcer" aria-live="polite"></div>
+        </div>
+
+        <!-- Controls Pane -->
+        <div class="share-controls-pane">
+          <!-- Format Switcher -->
+          <div class="share-control-group">
+            <label class="console-section-label" id="label-poster-format">POSTER FORMAT</label>
+            <div class="segmented-control" role="radiogroup" aria-labelledby="label-poster-format" id="poster-format-control">
+              <button role="radio" class="segment-btn active" data-format="landscape" aria-checked="true">1200×630<br><span class="seg-sub">Card</span></button>
+              <button role="radio" class="segment-btn" data-format="square" aria-checked="false">1080×1080<br><span class="seg-sub">Square</span></button>
+              <button role="radio" class="segment-btn" data-format="portrait" aria-checked="false">1080×1350<br><span class="seg-sub">Portrait</span></button>
+            </div>
+          </div>
+
+          <!-- Address Privacy Control -->
+          <div class="share-control-group">
+            <label class="console-section-label" id="label-poster-privacy">WALLET PRIVACY (POSTER &amp; LINK)</label>
+            <div class="segmented-control" role="radiogroup" aria-labelledby="label-poster-privacy" id="poster-privacy-control">
+              <button role="radio" class="segment-btn active" data-privacy="hide" aria-checked="true">Hide</button>
+              <button role="radio" class="segment-btn" data-privacy="short" aria-checked="false">Short (0x12…ab)</button>
+              <button role="radio" class="segment-btn" data-privacy="full" aria-checked="false">Full</button>
+            </div>
+            <p class="console-section-desc">Privacy default: address is omitted from image and share link unless opted in.</p>
+          </div>
+
+          <!-- Actions -->
+          <div class="share-action-buttons">
+            <button id="btn-download-png" class="btn-console-primary" style="width: 100%;">
+              Download PNG
+            </button>
+            <div style="display: flex; gap: 0.5rem; width: 100%; margin-top: 0.5rem;">
+              <button id="btn-web-share" class="btn-console-secondary" style="flex: 1;">
+                Share
+              </button>
+              <button id="btn-copy-share-link" class="btn-console-secondary" style="flex: 1;">
+                Copy link
+              </button>
+            </div>
+          </div>
+
+          <!-- Share feedback notice -->
+          <div id="share-modal-feedback" class="copy-feedback-msg" style="display: none;" aria-live="polite"></div>
+
+          <!-- Static preview disclaimer -->
+          <p class="console-section-desc" style="font-size: 0.68rem; color: var(--color-bone-subtle); margin-top: 0.5rem;">
+            Static site notice: social media scrapers display a fixed site card; the custom poster PNG is downloaded or shared directly.
+          </p>
+        </div>
+      </div>
     </div>
   </aside>
 

@@ -31,6 +31,10 @@ import { createSqueekCard, createCardSkeleton, pulseCardActivity } from './ui/ca
 import { AudioStateMachine, AUDIO_STATES } from './ui/audio-state.js';
 import { BackgroundWaveform } from './ui/waveform.js';
 import { CueManager } from './audio/cues.js';
+import { selectBestHour, composeBestHourExcerpt, BestHourPlayer } from './replay/best-hour.js';
+import { ShareCoordinator } from './share/share.js';
+import { TitleManager } from './platform/title.js';
+import { MediaSessionManager } from './platform/media-session.js';
 
 let visualizer = null;
 let centralDial = null;
@@ -45,6 +49,10 @@ let recordTimerInterval = null;
 let audioStateMachine = null;
 let bgWaveform = null;
 let cueManager = null;
+let bestHourPlayer = null;
+let shareCoordinator = null;
+let titleManager = null;
+let mediaSessionManager = null;
 
 // Application State
 export const state = {
@@ -59,6 +67,14 @@ export const state = {
   activeMode: 'live',
   walletAddress: '',
   spotlightToken: null,
+
+  // Feature 1 & 2 additions
+  isBestHourActive: false,
+  bestHourSelection: null,
+  bestHourInfo: null,
+  bandTokens: [],
+  currentBpm: 48,
+  currentKeyInfo: null,
 
   // Telemetry & Music state
   status: null,
@@ -229,6 +245,35 @@ export function updateUI(statusData) {
 
   // 7. Manage Demo Try highlight button visibility
   updateDemoTryButtons(mood);
+
+  // 8. Update Live Tab Title & Media Session Metadata
+  state.currentBpm = bpm;
+  state.currentKeyInfo = keyInfo;
+
+  if (titleManager) {
+    titleManager.update({
+      isTunedIn: state.isTunedIn,
+      mode: state.activeMode,
+      isBestHour: state.isBestHourActive,
+      isAvailable: Boolean(statusData.isAvailable !== false && statusData.freshness !== 'unavailable'),
+      freshness: statusData.freshness,
+      bpm,
+      blockHeight: statusData.blockHeight,
+      replayHourText: state.bestHourInfo?.utcTimeText,
+    });
+  }
+
+  if (mediaSessionManager && state.isTunedIn) {
+    mediaSessionManager.updateMetadata({
+      blockHeight: statusData.blockHeight,
+      scaleLabel,
+      bpm,
+      mood,
+      mode: state.activeMode,
+      hour: state.bestHourInfo?.hourIndex,
+    });
+    mediaSessionManager.setPlaybackState('playing');
+  }
 }
 
 /**
@@ -339,7 +384,29 @@ async function pollEconomy() {
  * Polls settlements from API.
  */
 async function pollSettlements() {
-  if (state.isDemo) return;
+  if (state.isDemo) {
+    if (!state.settlements) {
+      const now = Date.now();
+      const demoBuckets = Array.from({ length: 24 }, (_, i) => {
+        const startAt = new Date(now - (24 - i) * 3600000).toISOString();
+        const endAt = new Date(now - (23 - i) * 3600000).toISOString();
+        const work = i === 11 ? 2198 : (i === 10 ? 2177 : (i % 2 === 0 ? 0 : 450 + (i * 35)));
+        return {
+          startAt,
+          endAt,
+          settlementCount: 6,
+          workAdded: work,
+          completedBlockCount: Math.floor(work / 10),
+        };
+      });
+      state.settlements = { status: 'available', buckets: demoBuckets, settlementCount: 140 };
+      state.bestHourSelection = selectBestHour(state.settlements);
+      if (typeof state.updateBestHourUIElements === 'function') {
+        state.updateBestHourUIElements();
+      }
+    }
+    return;
+  }
   try {
     const raw = await apiFetch('/v1/settlements?range=24h');
     const parsed = parseSettlements(raw);
@@ -363,6 +430,12 @@ async function pollSettlements() {
       state.lastSettlementCount = parsed.settlementCount;
       state.settlements = parsed;
 
+      // Update Best Hour Selection
+      state.bestHourSelection = selectBestHour(parsed);
+      if (typeof state.updateBestHourUIElements === 'function') {
+        state.updateBestHourUIElements();
+      }
+
       // Populate initial settlement rows
       if (parsed.recentSettlements?.length && readoutsManager?.settlementRows.length <= 1) {
         parsed.recentSettlements.slice(0, 5).forEach((item) => {
@@ -370,9 +443,18 @@ async function pollSettlements() {
           readoutsManager.addSettlementEntry(t, item.roundNumber || '120', item.workAdded || '480k');
         });
       }
+    } else {
+      state.bestHourSelection = selectBestHour({ status: 'unavailable' });
+      if (typeof state.updateBestHourUIElements === 'function') {
+        state.updateBestHourUIElements();
+      }
     }
   } catch (err) {
     console.warn('Settlements poll failed:', err.message);
+    state.bestHourSelection = selectBestHour({ status: 'unavailable' });
+    if (typeof state.updateBestHourUIElements === 'function') {
+      state.updateBestHourUIElements();
+    }
   }
 }
 
@@ -471,6 +553,8 @@ export function spotlightToken(token) {
 export async function loadBandTokens(tokens) {
   const container = document.getElementById('band-cards-grid');
   const msgEl = document.getElementById('band-status-msg');
+
+  state.bandTokens = (tokens && !tokens.isUnavailable) ? tokens : [];
 
   if (bgWaveform) {
     bgWaveform.setBandActive(Boolean(tokens && tokens.length > 0));
@@ -678,7 +762,8 @@ export function updateShareUrl() {
  */
 export function updateDemoAndLiveButtons(mood) {
   const isDemo = Boolean(state.isDemo);
-  const isSleep = (mood === 'sleep') && !isDemo;
+  const isBestHour = Boolean(state.isBestHourActive);
+  const isSleep = (mood === 'sleep') && !isDemo && !isBestHour;
 
   const demoButtons = document.querySelectorAll('.btn-demo-try');
   demoButtons.forEach((btn) => {
@@ -687,7 +772,7 @@ export function updateDemoAndLiveButtons(mood) {
 
   const liveButtons = document.querySelectorAll('.btn-live-switch, .btn-header-live, #tab-live');
   liveButtons.forEach((btn) => {
-    btn.style.display = isDemo ? 'inline-flex' : 'none';
+    btn.style.display = (isDemo || isBestHour) ? 'inline-flex' : 'none';
   });
 }
 
@@ -743,6 +828,9 @@ export function activateDemoTry() {
  * Switches station from Demo mode back to live telemetry.
  */
 export async function activateLiveMode() {
+  if (state.isBestHourActive) {
+    stopBestHour();
+  }
   state.isDemo = false;
 
   // Remove ?demo from URL
@@ -1122,6 +1210,267 @@ function setupReplayControls() {
   }
 }
 
+/**
+ * Setup Best Hour Controls, HUD, and first-visit prompt (Feature 2).
+ */
+export function setupBestHourControls() {
+  const bottomBtn = document.getElementById('btn-best-hour');
+  const headerBtn = document.getElementById('btn-header-best-hour');
+  const consoleBtn = document.getElementById('btn-console-best-hour');
+  const hudCloseBtn = document.getElementById('btn-best-hour-hud-close');
+  const firstVisitHint = document.getElementById('first-visit-hint');
+
+  // Check first visit in localStorage safely
+  try {
+    const hasVisited = localStorage.getItem('sqk_has_visited');
+    if (!hasVisited && firstVisitHint) {
+      firstVisitHint.style.display = 'block';
+    }
+  } catch {}
+
+  const dismissFirstVisitHint = () => {
+    try {
+      localStorage.setItem('sqk_has_visited', '1');
+    } catch {}
+    if (firstVisitHint) firstVisitHint.style.display = 'none';
+  };
+
+  const updateBestHourUIElements = () => {
+    const res = state.bestHourSelection;
+    const rankEl = document.getElementById('best-hour-rank');
+    const workEl = document.getElementById('best-hour-work');
+    const blocksEl = document.getElementById('best-hour-blocks');
+    const localTimeEl = document.getElementById('best-hour-localtime');
+    const utcTimeEl = document.getElementById('best-hour-utctime');
+    const reasonEl = document.getElementById('best-hour-reason-msg');
+
+    if (!res || res.status !== 'ok') {
+      const reasonText = res?.reason || 'Hour data unknown right now.';
+      if (reasonEl) {
+        reasonEl.textContent = reasonText;
+        reasonEl.style.display = 'block';
+      }
+      if (rankEl) rankEl.textContent = '--';
+      if (workEl) workEl.textContent = '--';
+      if (blocksEl) blocksEl.textContent = '--';
+      if (localTimeEl) localTimeEl.textContent = '--';
+      if (utcTimeEl) utcTimeEl.textContent = '--';
+
+      if (bottomBtn) {
+        bottomBtn.disabled = true;
+        bottomBtn.title = reasonText;
+      }
+      if (headerBtn) {
+        headerBtn.disabled = true;
+        headerBtn.title = reasonText;
+      }
+      if (consoleBtn) {
+        consoleBtn.disabled = true;
+        consoleBtn.title = reasonText;
+      }
+      return;
+    }
+
+    if (reasonEl) reasonEl.style.display = 'none';
+    if (rankEl) rankEl.textContent = res.rankText;
+    if (workEl) workEl.textContent = `${res.workAdded} passes`;
+    if (blocksEl) blocksEl.textContent = `${res.completedBlockCount} blocks`;
+    if (localTimeEl) localTimeEl.textContent = res.localTimeText;
+    if (utcTimeEl) utcTimeEl.textContent = res.utcTimeText;
+
+    if (bottomBtn) {
+      bottomBtn.disabled = false;
+      bottomBtn.title = `Best hour (${res.rankText}): ${res.workAdded} passes (H)`;
+    }
+    if (headerBtn) {
+      headerBtn.disabled = false;
+      headerBtn.title = `Best hour (${res.rankText}): ${res.workAdded} passes`;
+    }
+    if (consoleBtn) {
+      consoleBtn.disabled = false;
+      consoleBtn.title = `Best hour (${res.rankText}): ${res.workAdded} passes`;
+    }
+  };
+
+  state.updateBestHourUIElements = updateBestHourUIElements;
+  updateBestHourUIElements();
+
+  const handleToggleBestHour = async () => {
+    dismissFirstVisitHint();
+
+    if (state.isBestHourActive) {
+      stopBestHour();
+      return;
+    }
+
+    if (!state.bestHourSelection || state.bestHourSelection.status !== 'ok') {
+      return;
+    }
+
+    await startBestHour();
+  };
+
+  if (bottomBtn) bottomBtn.addEventListener('click', handleToggleBestHour);
+  if (headerBtn) headerBtn.addEventListener('click', handleToggleBestHour);
+  if (consoleBtn) consoleBtn.addEventListener('click', handleToggleBestHour);
+  if (hudCloseBtn) hudCloseBtn.addEventListener('click', () => stopBestHour());
+}
+
+export async function startBestHour() {
+  const selection = state.bestHourSelection;
+  if (!selection || selection.status !== 'ok') return;
+
+  // Tune in if not already active
+  if (!state.isTunedIn) {
+    await tuneIn(true);
+  } else if (state.isMuted) {
+    state.isMuted = false;
+    audioEngine.setMute(false);
+    if (elements.muteBtn) {
+      elements.muteBtn.textContent = 'MUTE';
+      elements.muteBtn.style.color = 'var(--color-bone-muted)';
+    }
+  }
+
+  if (!bestHourPlayer) {
+    bestHourPlayer = new BestHourPlayer(audioEngine, {
+      onTick: (progress, elapsed, stage) => {
+        const hudRank = document.getElementById('best-hour-hud-rank');
+        const hudTime = document.getElementById('best-hour-hud-time');
+        const hudUtc = document.getElementById('best-hour-hud-utc');
+        const hudWork = document.getElementById('best-hour-hud-work');
+        const hudBlocks = document.getElementById('best-hour-hud-blocks');
+
+        if (hudRank) hudRank.textContent = selection.rankText;
+        if (hudTime) hudTime.textContent = selection.localTimeText;
+        if (hudUtc) hudUtc.textContent = selection.utcTimeText;
+        if (hudWork) hudWork.textContent = `${selection.workAdded} passes`;
+        if (hudBlocks) hudBlocks.textContent = `${selection.completedBlockCount} blocks`;
+
+        if (titleManager) {
+          titleManager.update({
+            isTunedIn: true,
+            isBestHour: true,
+            replayHourText: selection.utcTimeText,
+          });
+        }
+      },
+      onComplete: () => {
+        stopBestHour();
+      },
+    });
+  }
+
+  // Load excerpt
+  const loaded = bestHourPlayer.load(selection);
+  if (!loaded) return;
+
+  state.isBestHourActive = true;
+  state.bestHourInfo = selection;
+
+  // Highlight 24-segment ring on central dial
+  if (centralDial) {
+    centralDial.setActiveHour(selection.hourIndex);
+  }
+
+  // Show Best Hour HUD
+  const hudEl = document.getElementById('best-hour-hud');
+  if (hudEl) {
+    hudEl.style.display = 'flex';
+  }
+
+  // Update Live buttons
+  updateDemoAndLiveButtons('jog');
+
+  // Update button active label
+  const bottomBtn = document.getElementById('btn-best-hour');
+  const consoleBtn = document.getElementById('btn-console-best-hour');
+  if (bottomBtn) {
+    bottomBtn.classList.add('active');
+    bottomBtn.textContent = '■ Stop Best';
+  }
+  if (consoleBtn) {
+    consoleBtn.textContent = '■ Stop Excerpt';
+  }
+
+  await bestHourPlayer.play();
+}
+
+export function stopBestHour() {
+  if (bestHourPlayer) {
+    bestHourPlayer.stop();
+  }
+
+  state.isBestHourActive = false;
+  state.bestHourInfo = null;
+
+  // Reset 24-segment ring
+  if (centralDial) {
+    centralDial.setActiveHour(-1);
+  }
+
+  // Hide HUD
+  const hudEl = document.getElementById('best-hour-hud');
+  if (hudEl) {
+    hudEl.style.display = 'none';
+  }
+
+  // Reset button state
+  const bottomBtn = document.getElementById('btn-best-hour');
+  const consoleBtn = document.getElementById('btn-console-best-hour');
+  if (bottomBtn) {
+    bottomBtn.classList.remove('active');
+    bottomBtn.textContent = 'Best hour';
+  }
+  if (consoleBtn) {
+    consoleBtn.textContent = '▶ Play Best Hour Excerpt';
+  }
+
+  // Restore live telemetry cleanly without restarting audio context
+  if (state.lastGoodStatus) {
+    updateUI(state.lastGoodStatus);
+  }
+
+  const curMood = state.status ? resolveMood(state.status) : 'sleep';
+  updateDemoAndLiveButtons(curMood);
+
+  if (titleManager) {
+    titleManager.update({
+      isTunedIn: state.isTunedIn,
+      mode: 'live',
+      isAvailable: Boolean(state.status?.isAvailable !== false && state.status?.freshness !== 'unavailable'),
+      bpm: state.currentBpm,
+      blockHeight: state.status?.blockHeight,
+    });
+  }
+}
+
+/**
+ * Setup Share Band & Dial Poster Controls (Feature 1).
+ */
+export function setupShareControls() {
+  shareCoordinator = new ShareCoordinator({
+    getState: () => ({
+      status: state.status,
+      bpm: state.currentBpm,
+      keyInfo: state.currentKeyInfo,
+      activePalette: state.activePalette,
+      activeMode: state.activeMode,
+      isBestHourActive: state.isBestHourActive,
+      bestHourInfo: state.bestHourInfo,
+      bandTokens: state.bandTokens || [],
+      walletAddress: state.walletAddress || '',
+      siteUrl: window.location.host || 'squeektoshi.radio',
+    }),
+    getWaveformSample: () => audioEngine.getTimeDomainData(),
+  });
+
+  const bottomShareBtn = document.getElementById('btn-share-band');
+  const headerShareBtn = document.getElementById('btn-header-share');
+  if (bottomShareBtn) bottomShareBtn.addEventListener('click', () => shareCoordinator.open());
+  if (headerShareBtn) headerShareBtn.addEventListener('click', () => shareCoordinator.open());
+}
+
 let gestureAttached = false;
 function setupOneShotGestureTune() {
   if (gestureAttached) return;
@@ -1175,6 +1524,25 @@ export async function tuneIn(fromGesture = false) {
         elements.tuneBtn.setAttribute('aria-pressed', 'true');
       }
       if (elements.tuneText) elements.tuneText.textContent = 'Mute';
+
+      if (titleManager) {
+        titleManager.update({
+          isTunedIn: true,
+          mode: state.activeMode,
+          isBestHour: state.isBestHourActive,
+          isAvailable: Boolean(state.status?.isAvailable !== false && state.status?.freshness !== 'unavailable'),
+          freshness: state.status?.freshness,
+          bpm: state.currentBpm,
+          blockHeight: state.status?.blockHeight,
+        });
+      }
+
+      if (mediaSessionManager) {
+        mediaSessionManager.setPlaybackState('playing');
+        if (fromGesture) {
+          mediaSessionManager.enableStreamRouting();
+        }
+      }
     } else if (!fromGesture) {
       setupOneShotGestureTune();
     }
@@ -1203,6 +1571,17 @@ export async function toggleAudio() {
       elements.tuneBtn.setAttribute('aria-pressed', 'false');
     }
     if (elements.tuneText) elements.tuneText.textContent = 'Tune in';
+
+    if (titleManager) {
+      titleManager.update({
+        isTunedIn: false,
+        mode: state.activeMode,
+      });
+    }
+
+    if (mediaSessionManager) {
+      mediaSessionManager.setPlaybackState('paused');
+    }
   } else {
     await tuneIn(true);
   }
@@ -1478,10 +1857,20 @@ export function init() {
       e.preventDefault();
       const tabBand = document.getElementById('tab-band');
       if (tabBand) tabBand.click();
+    } else if (e.code === 'KeyH') {
+      e.preventDefault();
+      const bestBtn = document.getElementById('btn-best-hour');
+      if (bestBtn && !bestBtn.disabled) bestBtn.click();
+    } else if (e.code === 'KeyS') {
+      e.preventDefault();
+      if (shareCoordinator) shareCoordinator.open();
     } else if (e.code === 'KeyM') {
       e.preventDefault();
       if (elements.muteBtn) elements.muteBtn.click();
     } else if (e.code === 'Escape') {
+      if (shareCoordinator && shareCoordinator.isOpen) {
+        shareCoordinator.close();
+      }
       const consoleDrawer = document.getElementById('console-drawer');
       const diagPanel = document.getElementById('diagnostics-panel');
       if (consoleDrawer) {
@@ -1499,6 +1888,38 @@ export function init() {
     }
   });
 
+  // Platform Live Title Manager
+  titleManager = new TitleManager();
+  titleManager.update({
+    isTunedIn: false,
+    mode: state.activeMode,
+  });
+
+  // Lock-Screen Controls & Media Session Manager
+  mediaSessionManager = new MediaSessionManager({
+    audioEngine,
+    getState: () => state,
+    onPlay: () => {
+      if (!state.isTunedIn || state.isMuted) toggleAudio();
+    },
+    onPause: () => {
+      if (state.isTunedIn && !state.isMuted) toggleAudio();
+    },
+    onStop: () => {
+      if (state.isTunedIn) toggleAudio();
+    },
+    onPrevHour: () => {
+      if (replayPlayer && replayPlayer.isPlaying) {
+        replayPlayer.seek(Math.max(0, replayPlayer.currentHour - 1));
+      }
+    },
+    onNextHour: () => {
+      if (replayPlayer && replayPlayer.isPlaying) {
+        replayPlayer.seek(Math.min(23, replayPlayer.currentHour + 1));
+      }
+    },
+  });
+
   // Setup Feature Modules
   setupConsoleDrawer();
   setupDemoTryControls();
@@ -1507,12 +1928,24 @@ export function init() {
   setupOverlayVariants();
   setupReplayControls();
   setupBandControls();
+  setupBestHourControls();
+  setupShareControls();
   startPolling();
 
   // If ?debug URL query present, open diagnostics immediately
   if (urlParams.has('debug')) {
     const diagBtn = document.getElementById('btn-open-diag');
     if (diagBtn) diagBtn.click();
+  }
+
+  // If ?besthour URL query present, activate best hour
+  if (urlParams.get('besthour') === '1') {
+    setTimeout(() => {
+      const bestBtn = document.getElementById('btn-best-hour');
+      if (bestBtn && !bestBtn.disabled) {
+        bestBtn.click();
+      }
+    }, 300);
   }
 
   // If wallet parameter in URL, auto-load and reveal band drawer

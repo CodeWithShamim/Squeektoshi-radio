@@ -37,6 +37,14 @@
     {
       "source": "/diagnostics",
       "destination": "/app.html?diag=1"
+    },
+    {
+      "source": "/besthour",
+      "destination": "/app.html?besthour=1"
+    },
+    {
+      "source": "/share",
+      "destination": "/app.html?share=1"
     }
   ],
   "headers": [
@@ -81,6 +89,15 @@
     },
     {
       "source": "/src/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=86400, stale-while-revalidate=604800"
+        }
+      ]
+    },
+    {
+      "source": "/(share|replay|platform)/(.*)",
       "headers": [
         {
           "key": "Cache-Control",

@@ -1027,6 +1027,11 @@ body.overlay-mode .overlay-now-playing {
     gap: 0.6rem;
   }
 
+  #btn-header-best-hour,
+  #btn-header-share {
+    display: none !important;
+  }
+
   .btn-header-console,
   .btn-header-demo,
   .btn-header-live {
@@ -1071,7 +1076,9 @@ body.overlay-mode .overlay-now-playing {
   
   .controls-left, .controls-right {
     width: 100%;
-    justify-content: space-between;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 0.5rem;
   }
   
   .keyboard-hints {

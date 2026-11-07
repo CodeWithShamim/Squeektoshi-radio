@@ -112,7 +112,10 @@ export class MotionSystem {
       tuneText.style.transform = 'translateY(-10px)';
       tuneText.style.opacity = '0';
       setTimeout(() => {
-        tuneText.textContent = 'Mute';
+        const tuneBtn = document.getElementById('tune-btn');
+        if (!tuneBtn || tuneBtn.getAttribute('aria-pressed') === 'true') {
+          tuneText.textContent = 'Mute';
+        }
         tuneText.style.transform = 'translateY(10px)';
         requestAnimationFrame(() => {
           tuneText.style.transform = 'translateY(0)';

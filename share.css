@@ -1,0 +1,193 @@
+/* ==========================================================================
+   Squeektoshi Radio — Features Stylesheet (share.css)
+   Features: (1) Share Your Band Poster Modal, (2) Best Hour Floating HUD
+   Design Tokens: Ink #0b0b0e, Bone #e9e6dc, Signal Amber #ffb23e, Data Blue #5b8cff
+   ========================================================================== */
+
+/* 1. Best Hour Floating HUD & First-Visit Hint */
+.first-visit-hint {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--color-bone-muted);
+  letter-spacing: 0.02em;
+  padding-left: 2px;
+}
+
+.best-hour-hud {
+  position: absolute;
+  top: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  display: flex;
+  justify-content: center;
+  width: max-content;
+  max-width: 95%;
+  pointer-events: auto;
+}
+
+.best-hour-hud-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  background-color: var(--color-ink);
+  border: 1px solid var(--color-amber);
+  padding: 0.4rem 0.8rem;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--color-bone);
+  white-space: nowrap;
+  flex-wrap: wrap;
+}
+
+.best-hour-hud-badge {
+  color: var(--color-amber);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+
+.best-hour-hud-val {
+  color: var(--color-bone);
+}
+
+.best-hour-hud-dim {
+  color: var(--color-bone-muted);
+}
+
+.hud-sep {
+  color: var(--color-hairline-bright);
+}
+
+.best-hour-hud-close {
+  background: transparent;
+  border: 1px solid var(--color-hairline-bright);
+  color: var(--color-bone-muted);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  padding: 0.15rem 0.4rem;
+  cursor: pointer;
+  margin-left: 0.4rem;
+  transition: all 0.3s ease;
+}
+
+.best-hour-hud-close:hover {
+  background: var(--color-amber);
+  color: var(--color-ink);
+  border-color: var(--color-amber);
+}
+
+.best-hour-hud-close:focus-visible {
+  outline: 2px solid var(--color-amber);
+  outline-offset: 2px;
+}
+
+/* 2. Share Band Poster Modal Dialog (Feature 1) */
+.share-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1), visibility 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.share-modal.open {
+  visibility: visible;
+  opacity: 1;
+}
+
+.share-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background-color: rgba(11, 11, 14, 0.88);
+}
+
+.share-modal-content {
+  position: relative;
+  z-index: 2;
+  width: min(980px, 94vw);
+  max-height: 90vh;
+  background-color: var(--color-ink);
+  border: 1px solid var(--color-hairline-bright);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.share-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--color-hairline);
+}
+
+.share-modal-body {
+  padding: 1.5rem;
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 1.5rem;
+  overflow-y: auto;
+}
+
+@media (max-width: 820px) {
+  .share-modal-body {
+    grid-template-columns: 1fr;
+  }
+}
+
+.share-preview-pane {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(233, 230, 220, 0.02);
+  border: 1px solid var(--color-hairline);
+  padding: 1rem;
+  min-height: 280px;
+}
+
+.share-canvas-container {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.poster-preview-canvas {
+  max-width: 100%;
+  max-height: 380px;
+  width: auto;
+  height: auto;
+  border: 1px solid var(--color-hairline);
+  box-shadow: none;
+}
+
+.share-controls-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.share-control-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.seg-sub {
+  font-size: 0.62rem;
+  color: var(--color-bone-muted);
+  font-weight: 400;
+}
+
+.btn-console-secondary:focus-visible,
+.btn-console-primary:focus-visible,
+.segment-btn:focus-visible,
+.drawer-close-btn:focus-visible {
+  outline: 2px solid var(--color-amber);
+  outline-offset: 2px;
+}
