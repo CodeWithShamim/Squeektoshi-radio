@@ -114,9 +114,12 @@ export class ShareCoordinator {
     this.modal.setAttribute('aria-hidden', 'false');
 
     // Freeze recent waveform output at moment of opening Share
-    this.cachedWaveform = this.getWaveformSample();
-
-    this.renderPreview();
+    try {
+      this.cachedWaveform = this.getWaveformSample();
+      this.renderPreview();
+    } catch (err) {
+      console.warn('Share modal preview render error:', err);
+    }
   }
 
   /**

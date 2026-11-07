@@ -14,15 +14,15 @@
 }
 
 .best-hour-hud {
-  position: absolute;
-  top: 1rem;
+  position: fixed;
+  top: 4.5rem;
   left: 50%;
   transform: translateX(-50%);
-  z-index: 100;
+  z-index: 1000;
   display: flex;
   justify-content: center;
   width: max-content;
-  max-width: 95%;
+  max-width: 95vw;
   pointer-events: auto;
 }
 
@@ -91,12 +91,14 @@
   justify-content: center;
   visibility: hidden;
   opacity: 0;
+  pointer-events: none;
   transition: opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1), visibility 0.6s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .share-modal.open {
   visibility: visible;
   opacity: 1;
+  pointer-events: auto;
 }
 
 .share-modal-backdrop {

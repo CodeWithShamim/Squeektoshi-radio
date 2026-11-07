@@ -816,6 +816,19 @@ export function activateDemoTry() {
     window.history.replaceState({}, '', url);
   } catch {}
 
+  // Immediately update status and UI to Jog mode without waiting for poll interval
+  const demoData = getDemoStatus(20000);
+  state.status = demoData;
+  state.lastGoodStatus = demoData;
+  state.currentBpm = calculateBpm(demoData.rpm);
+  updateUI(demoData);
+  if (centralDial) {
+    centralDial.setTelemetry(demoData);
+  }
+
+  // Load demo band tokens immediately so band cards populate
+  loadBandTokens(getDemoBandTokens());
+
   // Tune in if not already active
   if (!state.isTunedIn) {
     tuneIn(true);
@@ -828,13 +841,7 @@ export function activateDemoTry() {
     }
   }
 
-  // Pre-populate demo band tokens if empty
-  const bandGrid = document.getElementById('band-cards-grid');
-  if (bandGrid && !bandGrid.children.length) {
-    loadBandTokens(getDemoBandTokens());
-  }
-
-  // Immediately poll status to update state & UI
+  // Poll status to keep scheduler updated
   pollStatus();
 }
 
@@ -1318,7 +1325,18 @@ export function setupBestHourControls() {
     }
 
     if (!state.bestHourSelection || state.bestHourSelection.status !== 'ok') {
-      return;
+      if (state.settlements) {
+        state.bestHourSelection = selectBestHour(state.settlements);
+      }
+      if (!state.bestHourSelection || state.bestHourSelection.status !== 'ok') {
+        const hint = document.getElementById('first-visit-hint');
+        if (hint) {
+          hint.textContent = 'Best hour data is loading...';
+          hint.style.display = 'block';
+          setTimeout(() => { if (hint) hint.style.display = 'none'; }, 2500);
+        }
+        return;
+      }
     }
 
     await startBestHour();
@@ -1398,10 +1416,17 @@ export async function startBestHour() {
 
   // Update button active label
   const bottomBtn = document.getElementById('btn-best-hour');
+  const headerBtn = document.getElementById('btn-header-best-hour');
   const consoleBtn = document.getElementById('btn-console-best-hour');
   if (bottomBtn) {
     bottomBtn.classList.add('active');
     bottomBtn.textContent = '■ Stop Best';
+  }
+  if (headerBtn) {
+    headerBtn.classList.add('active');
+    headerBtn.textContent = '■ Stop Best';
+    headerBtn.style.color = 'var(--color-amber)';
+    headerBtn.style.borderColor = 'var(--color-amber)';
   }
   if (consoleBtn) {
     consoleBtn.textContent = '■ Stop Excerpt';
@@ -1431,10 +1456,17 @@ export function stopBestHour() {
 
   // Reset button state
   const bottomBtn = document.getElementById('btn-best-hour');
+  const headerBtn = document.getElementById('btn-header-best-hour');
   const consoleBtn = document.getElementById('btn-console-best-hour');
   if (bottomBtn) {
     bottomBtn.classList.remove('active');
     bottomBtn.textContent = 'Best hour';
+  }
+  if (headerBtn) {
+    headerBtn.classList.remove('active');
+    headerBtn.textContent = 'Best hour';
+    headerBtn.style.color = '';
+    headerBtn.style.borderColor = '';
   }
   if (consoleBtn) {
     consoleBtn.textContent = '▶ Play Best Hour Excerpt';
@@ -1512,6 +1544,18 @@ export async function tuneIn(fromGesture = false) {
     audioStateMachine.setState(AUDIO_STATES.PREPARING);
   }
   try {
+    if (fromGesture) {
+      if (!audioEngine.isInitialized) {
+        audioEngine.init();
+      }
+      if (audioEngine.ctx && audioEngine.ctx.state === 'suspended') {
+        try {
+          await audioEngine.ctx.resume();
+        } catch (e) {
+          console.warn('Direct ctx resume:', e);
+        }
+      }
+    }
     await audioEngine.start();
     if (audioEngine.ctx && audioEngine.ctx.state === 'running') {
       if (cueManager) {
@@ -1735,10 +1779,22 @@ export function init() {
       cueToggleBtn.style.borderColor = enabled ? 'var(--color-amber)' : 'var(--color-hairline)';
     };
     updateCueBtn(cueManager.isEnabled());
-    cueToggleBtn.addEventListener('click', () => {
+    cueToggleBtn.addEventListener('click', async () => {
       cueManager.unlock();
+      if (!audioEngine.isInitialized) {
+        audioEngine.init();
+      }
+      if (audioEngine.ctx && audioEngine.ctx.state === 'suspended') {
+        try { await audioEngine.ctx.resume(); } catch {}
+      }
+      if (audioEngine.ctx) {
+        cueManager.init(audioEngine.ctx);
+      }
       const newState = cueManager.toggle();
       updateCueBtn(newState);
+      if (newState) {
+        cueManager.playReady();
+      }
     });
   }
 
