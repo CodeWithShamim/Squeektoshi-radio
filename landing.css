@@ -10,7 +10,7 @@
   font-style: normal;
   font-weight: 600;
   font-display: swap;
-  src: url('assets/fonts/cinzel.woff2') format('woff2');
+  src: url('/assets/fonts/cinzel.woff2') format('woff2');
 }
 
 @font-face {
@@ -18,7 +18,7 @@
   font-style: normal;
   font-weight: 800;
   font-display: swap;
-  src: url('assets/fonts/cinzel.woff2') format('woff2');
+  src: url('/assets/fonts/cinzel.woff2') format('woff2');
 }
 
 @font-face {
@@ -26,7 +26,7 @@
   font-style: normal;
   font-weight: 400;
   font-display: swap;
-  src: url('assets/fonts/ibm-plex-mono-regular.woff2') format('woff2');
+  src: url('/assets/fonts/ibm-plex-mono-regular.woff2') format('woff2');
 }
 
 @font-face {
@@ -34,7 +34,7 @@
   font-style: normal;
   font-weight: 600;
   font-display: swap;
-  src: url('assets/fonts/ibm-plex-mono-semibold.woff2') format('woff2');
+  src: url('/assets/fonts/ibm-plex-mono-semibold.woff2') format('woff2');
 }
 
 /* 2. Custom Properties */

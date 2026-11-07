@@ -1,8 +1,5 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "framework": null,
-  "outputDirectory": ".",
-  "buildCommand": null,
   "cleanUrls": false,
   "trailingSlash": false,
   "rewrites": [
@@ -11,7 +8,15 @@
       "destination": "/app.html"
     },
     {
+      "source": "/app/",
+      "destination": "/app.html"
+    },
+    {
       "source": "/overlay",
+      "destination": "/app.html?overlay=1"
+    },
+    {
+      "source": "/overlay/",
       "destination": "/app.html?overlay=1"
     },
     {
@@ -19,7 +24,15 @@
       "destination": "/app.html?demo"
     },
     {
+      "source": "/demo/",
+      "destination": "/app.html?demo"
+    },
+    {
       "source": "/orchestra",
+      "destination": "/app.html?mode=orchestra"
+    },
+    {
+      "source": "/orchestra/",
       "destination": "/app.html?mode=orchestra"
     },
     {
@@ -27,7 +40,15 @@
       "destination": "/app.html?mode=replay"
     },
     {
+      "source": "/replay/",
+      "destination": "/app.html?mode=replay"
+    },
+    {
       "source": "/band",
+      "destination": "/app.html?mode=band"
+    },
+    {
+      "source": "/band/",
       "destination": "/app.html?mode=band"
     },
     {
@@ -35,7 +56,15 @@
       "destination": "/app.html?console=1"
     },
     {
+      "source": "/console/",
+      "destination": "/app.html?console=1"
+    },
+    {
       "source": "/diagnostics",
+      "destination": "/app.html?diag=1"
+    },
+    {
+      "source": "/diagnostics/",
       "destination": "/app.html?diag=1"
     },
     {
@@ -43,7 +72,15 @@
       "destination": "/app.html?besthour=1"
     },
     {
+      "source": "/besthour/",
+      "destination": "/app.html?besthour=1"
+    },
+    {
       "source": "/share",
+      "destination": "/app.html?share=1"
+    },
+    {
+      "source": "/share/",
       "destination": "/app.html?share=1"
     }
   ],
@@ -61,7 +98,7 @@
         },
         {
           "key": "Permissions-Policy",
-          "value": "autoplay=*"
+          "value": "autoplay=(self)"
         },
         {
           "key": "Access-Control-Allow-Origin",
@@ -73,6 +110,10 @@
       "source": "/",
       "headers": [
         {
+          "key": "Content-Type",
+          "value": "text/html; charset=utf-8"
+        },
+        {
           "key": "Cache-Control",
           "value": "public, max-age=0, must-revalidate"
         }
@@ -82,35 +123,12 @@
       "source": "/(.*).html",
       "headers": [
         {
+          "key": "Content-Type",
+          "value": "text/html; charset=utf-8"
+        },
+        {
           "key": "Cache-Control",
           "value": "public, max-age=0, must-revalidate"
-        }
-      ]
-    },
-    {
-      "source": "/src/(.*)",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=86400, stale-while-revalidate=604800"
-        }
-      ]
-    },
-    {
-      "source": "/(share|replay|platform)/(.*)",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=86400, stale-while-revalidate=604800"
-        }
-      ]
-    },
-    {
-      "source": "/vendor/(.*)",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=86400, stale-while-revalidate=604800"
         }
       ]
     },
@@ -118,8 +136,38 @@
       "source": "/(.*).css",
       "headers": [
         {
+          "key": "Content-Type",
+          "value": "text/css; charset=utf-8"
+        },
+        {
           "key": "Cache-Control",
           "value": "public, max-age=86400, stale-while-revalidate=604800"
+        }
+      ]
+    },
+    {
+      "source": "/(.*).(js|mjs)",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/javascript; charset=utf-8"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=86400, stale-while-revalidate=604800"
+        }
+      ]
+    },
+    {
+      "source": "/(.*).woff2",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "font/woff2"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
         }
       ]
     },
@@ -135,6 +183,10 @@
     {
       "source": "/card.png",
       "headers": [
+        {
+          "key": "Content-Type",
+          "value": "image/png"
+        },
         {
           "key": "Cache-Control",
           "value": "public, max-age=31536000, immutable"

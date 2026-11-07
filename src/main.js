@@ -1539,11 +1539,11 @@ export async function tuneIn(fromGesture = false) {
 
       if (mediaSessionManager) {
         mediaSessionManager.setPlaybackState('playing');
-        if (fromGesture) {
-          mediaSessionManager.enableStreamRouting();
-        }
       }
     } else if (!fromGesture) {
+      if (audioStateMachine) {
+        audioStateMachine.setState(AUDIO_STATES.IDLE);
+      }
       setupOneShotGestureTune();
     }
   } catch (err) {

@@ -6,6 +6,7 @@
 
 @import url('tokens.css');
 @import url('console.css');
+@import url('share.css');
 
 *, *::before, *::after {
   box-sizing: border-box;
