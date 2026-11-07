@@ -32,14 +32,154 @@
     </div>
   </aside>
 
-  <!-- Main Web Radio Experience -->
-  <main class="app-container" id="main-content">
+  <!-- Top Sticky Navigation Bar -->
+  <nav class="site-nav" aria-label="Main Navigation">
+    <div class="nav-container">
+      <a href="#" class="brand-link" aria-label="Squeektoshi Radio Home">
+        <div class="brand-icon" aria-hidden="true">🐹</div>
+        <div class="brand-name">Squeektoshi <span>Radio</span></div>
+      </a>
+
+      <div class="nav-links">
+        <a href="#features" class="nav-link">Features</a>
+        <a href="#app-station" class="nav-link">Live Station</a>
+        <a href="#replay-panel" class="nav-link">24h Replay</a>
+        <a href="#band-section" class="nav-link">NFT Band</a>
+        <a href="#how-it-works" class="nav-link">How It Works</a>
+        <a href="https://github.com/CodeWithShamim/Squeektoshi-radio" target="_blank" rel="noopener noreferrer" class="nav-link">GitHub</a>
+      </div>
+
+      <div class="nav-actions">
+        <a href="#app-station" id="nav-launch-btn" class="btn-launch-app">
+          <span aria-hidden="true">🚀</span>
+          <span>Launch App</span>
+        </a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Hero Section -->
+  <header class="landing-hero" id="hero">
+    <div class="hero-glow-blob" aria-hidden="true"></div>
+
+    <div class="hero-pill-badge">
+      <span class="hero-pill-dot" aria-hidden="true"></span>
+      <span>WHEELY9000 Online · Sepolia PoW Telemetry</span>
+    </div>
+
+    <h1 class="hero-title">
+      Turn Hamster Proof-of-Work into a <span class="gradient-text">Live Generative Radio Station</span>
+    </h1>
+
+    <p class="hero-subtitle">
+      Squeektoshi Radio turns physical hamster wheel rotations on Ethereum into an evolving ambient soundscape. Wheel RPM drives tempo, block height sets harmony, and your Squeek NFTs join the band. 100% browser synthesized with zero audio samples.
+    </p>
+
+    <div class="hero-cta-group">
+      <a href="#app-station" class="btn-hero-primary">
+        <span aria-hidden="true">📻</span>
+        <span>Launch Station Studio</span>
+      </a>
+      <a href="/?demo" class="btn-hero-secondary">
+        <span aria-hidden="true">✨</span>
+        <span>Try Demo Mode</span>
+      </a>
+      <a href="/?overlay=1" target="_blank" class="btn-hero-secondary">
+        <span aria-hidden="true">📺</span>
+        <span>OBS Stream Overlay</span>
+      </a>
+    </div>
+
+    <!-- Live Telemetry Ticker Strip -->
+    <div class="hero-ticker-bar" aria-label="Real-time Telemetry Overview">
+      <div class="ticker-item">
+        <span class="ticker-label">Wheel Speed</span>
+        <span id="hero-rpm" class="ticker-val">0.0 RPM</span>
+      </div>
+      <div class="ticker-item">
+        <span class="ticker-label">Hamster Mood</span>
+        <span id="hero-mood" class="ticker-val gold">SLEEP</span>
+      </div>
+      <div class="ticker-item">
+        <span class="ticker-label">Squeek Block</span>
+        <span id="hero-block" class="ticker-val blue">#0</span>
+      </div>
+      <div class="ticker-item">
+        <span class="ticker-label">SQK Minted</span>
+        <span id="hero-sqk" class="ticker-val gold">0 SQK</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Current Features Showcase Section -->
+  <section class="features-section" id="features" aria-label="Key Features">
+    <div class="section-header">
+      <span class="section-tag">Engine Highlights</span>
+      <h2 class="section-title">Built for Music, Not Just Data</h2>
+      <p class="section-subtitle">
+        Squeektoshi Radio is not a dashboard or explorer. It is a standalone, procedural audio instrument powered by real wheel physics.
+      </p>
+    </div>
+
+    <div class="features-grid">
+      <!-- Card 1 -->
+      <article class="feature-card">
+        <div class="feature-icon-box" aria-hidden="true">🎛️</div>
+        <span class="feature-badge">Web Audio API</span>
+        <h3>100% Procedural Synthesis</h3>
+        <p>Zero audio sample files, mp3s, or third-party audio libraries. Kicks, hi-hats, plucks, pads, inharmonic FM bells, leads, and marimbas are generated purely mathematically.</p>
+      </article>
+
+      <!-- Card 2 -->
+      <article class="feature-card">
+        <div class="feature-icon-box" aria-hidden="true">🐹</div>
+        <span class="feature-badge">PoW Telemetry</span>
+        <h3>Hardware-Driven Harmony</h3>
+        <p>Wheel RPM accelerates tempo from 48 to 160 BPM. Squeek block heights transpose the key in real-time, and block progress physically sweeps open the master low-pass filter.</p>
+      </article>
+
+      <!-- Card 3 -->
+      <article class="feature-card">
+        <div class="feature-icon-box" aria-hidden="true">🎸</div>
+        <span class="feature-badge">Feature 3</span>
+        <h3>Your Squeeks Are the Band</h3>
+        <p>Input any public Ethereum address. Squeek NFTs join the ensemble as synthesized voices (levels 1–5), spatially panned in 3D stereo with live pulsing card glows.</p>
+      </article>
+
+      <!-- Card 4 -->
+      <article class="feature-card">
+        <div class="feature-icon-box" aria-hidden="true">🎼</div>
+        <span class="feature-badge">Feature 2</span>
+        <h3>24-Hour Symphony Replay</h3>
+        <p>Scores the past 24 hourly buckets from Sepolia into a 2-minute deterministic composition. Work tertiles set mood transitions with interactive timeline scrubbing.</p>
+      </article>
+
+      <!-- Card 5 -->
+      <article class="feature-card">
+        <div class="feature-icon-box" aria-hidden="true">📡</div>
+        <span class="feature-badge">Serverless Sync</span>
+        <h3>Shared Listening via PRNG</h3>
+        <p>Derives note choices from a Mulberry32 PRNG seeded by block height and epoch steps. Two listeners opening the stream at the same second hear the exact same melody without servers.</p>
+      </article>
+
+      <!-- Card 6 -->
+      <article class="feature-card">
+        <div class="feature-icon-box" aria-hidden="true">📺</div>
+        <span class="feature-badge">Feature 4</span>
+        <h3>OBS Stream Overlay Ready</h3>
+        <p>Streamers can drop the radio station directly into OBS as a transparent or green-screen browser source widget with built-in audio routing controls.</p>
+      </article>
+    </div>
+  </section>
+
+  <!-- Main Radio Station App Console -->
+  <main class="app-container" id="app-station">
     <!-- Header -->
     <header class="station-header">
       <div class="brand-title-group">
-        <div class="brand-icon" aria-hidden="true">🐹</div>
+        <div class="brand-icon" aria-hidden="true">📻</div>
         <div>
-          <h1 class="brand-name">Squeektoshi <span>Radio</span></h1>
+          <h2 class="station-console-title" style="font-size: 1.25rem; font-weight: 800; letter-spacing: -0.02em;">Live Station <span style="color: var(--gold-primary);">Console</span></h2>
         </div>
       </div>
       <div class="header-status-strip">
@@ -107,7 +247,7 @@
             <span>Block Progress (Filter Opening)</span>
             <span id="val-progress-pct">0%</span>
           </div>
-          <div class="progress-bar-track" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" id="progress-track">
+          <div class="progress-bar-track" role="progressbar" aria-label="Squeek Block Progress" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" id="progress-track">
             <div id="progress-bar-fill" class="progress-bar-fill"></div>
           </div>
         </div>
@@ -153,7 +293,7 @@
     </section>
 
     <!-- Squeek Band Section (F3) -->
-    <section class="band-section" aria-label="Your Squeeks in the Band">
+    <section id="band-section" class="band-section" aria-label="Your Squeeks in the Band">
       <div class="band-header">
         <div class="band-title-group">
           <h2>Your Squeeks Are the Band</h2>
@@ -173,7 +313,7 @@
     </section>
 
     <!-- How It Works & Proof Limits Panel (F6) -->
-    <section class="info-section" aria-label="How It Works & Proof Limits">
+    <section id="how-it-works" class="info-section" aria-label="How It Works & Proof Limits">
       <h3>How Squeektoshi Radio Works</h3>
       <p>
         Squeektoshi Radio translates physical proof-of-work telemetry from the WHEELY9000 sensor on Squeekchain into a continuous generative soundscape. Wheel rotations modulate tempo and rhythmic density, block heights establish root keys, and completed rounds trigger harmonic shifts.
@@ -184,8 +324,23 @@
     </section>
   </main>
 
+  <!-- Site Footer -->
+  <footer class="site-footer">
+    <div class="footer-container">
+      <div class="footer-brand">
+        <div style="font-weight: 700; font-size: 1rem;">🐹 Squeektoshi Radio</div>
+        <div style="font-size: 0.8rem; color: var(--text-muted);">Hamster-Powered Generative Music on Squeekchain Telemetry</div>
+      </div>
+      <div class="footer-links">
+        <a href="#hero" class="footer-link">Back to Top</a>
+        <a href="#app-station" class="footer-link">Launch App</a>
+        <a href="https://docs.squeekchain.com" target="_blank" rel="noopener noreferrer" class="footer-link">Squeekchain Docs</a>
+        <a href="https://github.com/CodeWithShamim/Squeektoshi-radio" target="_blank" rel="noopener noreferrer" class="footer-link">GitHub Repository</a>
+      </div>
+    </div>
+  </footer>
+
   <!-- Main ES Module Entry Point -->
   <script type="module" src="src/main.js"></script>
 </body>
 </html>
-

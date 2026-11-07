@@ -74,6 +74,11 @@ const elements = {
   overlayBpm: document.getElementById('overlay-bpm'),
   overlayBlock: document.getElementById('overlay-block'),
   overlayProgress: document.getElementById('overlay-progress'),
+
+  heroRpm: document.getElementById('hero-rpm'),
+  heroMood: document.getElementById('hero-mood'),
+  heroBlock: document.getElementById('hero-block'),
+  heroSqk: document.getElementById('hero-sqk'),
 };
 
 /**
@@ -149,6 +154,14 @@ export function updateUI(statusData) {
   if (elements.overlayBlock) elements.overlayBlock.textContent = `#${statusData.blockHeight ?? 0}`;
   if (elements.overlayProgress) elements.overlayProgress.textContent = `${progressPct}%`;
 
+  // Hero Ticker sync
+  if (elements.heroRpm) elements.heroRpm.textContent = `${(statusData.rpm || 0).toFixed(1)} RPM`;
+  if (elements.heroMood) {
+    elements.heroMood.textContent = mood.toUpperCase();
+    elements.heroMood.className = `ticker-val ${mood === 'zoomies' ? 'gold' : mood === 'jog' ? 'blue' : ''}`;
+  }
+  if (elements.heroBlock) elements.heroBlock.textContent = `#${statusData.blockHeight ?? 0}`;
+
   // Feed to audio engine
   audioEngine.updateTelemetry(statusData);
 
@@ -162,10 +175,11 @@ export function updateUI(statusData) {
  * Update economy widgets with SQK minted.
  */
 export function updateEconomyUI(economyData) {
-  if (!economyData || !elements.valSqkMinted) return;
+  if (!economyData) return;
   if (economyData.totalMintedSQK !== undefined) {
     const formatted = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(economyData.totalMintedSQK);
-    elements.valSqkMinted.textContent = `${formatted} SQK`;
+    if (elements.valSqkMinted) elements.valSqkMinted.textContent = `${formatted} SQK`;
+    if (elements.heroSqk) elements.heroSqk.textContent = `${formatted} SQK`;
   }
 }
 
