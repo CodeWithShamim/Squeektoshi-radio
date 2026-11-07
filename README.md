@@ -31,7 +31,7 @@ Squeektoshi Radio turns the live WHEELY9000 hamster wheel into a continuous, gen
    - Interactive timeline scrubber with active hour highlights.
 
 4. **Your Squeeks Are the Band (Feature 3)**
-   - Paste any public Ethereum wallet address (read-only GET request, zero wallet connections or signatures).
+   - Paste any public Ethereum wallet address (non-custodial GET request, zero wallet connections or signatures).
    - Each Squeek NFT becomes an instrument voice assigned by level:
      - **Level 1**: Plucked acoustic guitar
      - **Level 2**: Inharmonic FM chime bell
@@ -191,7 +191,7 @@ Open your browser to:
 ### Keyboard Shortcuts & Professional Console
 - `Space`: Tune In / Mute toggle
 - `C`: Open / Close Professional Console Drawer (Mode selector, Sound palettes, Export clip, Shareable URL)
-- `D`: Open / Close System Diagnostics & Telemetry Panel (FPS, Lateness, Voice count, Request tracker)
+- `D`: Open / Close System Diagnostics & Telemetry Panel (FPS, Lateness, Voice count, Request monitor)
 - `H`: Play Best Hour of the Last 24 Hours
 - `S`: Open Share Band Poster Generator
 - `R`: Toggle 24-Hour Replay Day Panel

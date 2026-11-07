@@ -200,6 +200,31 @@ body {
   color: var(--color-bone-muted);
 }
 
+.hud-launch-pill {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  background: rgba(255, 178, 62, 0.1);
+  border: 1px solid var(--color-amber);
+  color: var(--color-amber);
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  letter-spacing: 0.08em;
+  text-decoration: none;
+  border-radius: 2px;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.hud-launch-pill:hover,
+.hud-launch-pill:focus-visible {
+  background: var(--color-amber);
+  color: #121316;
+  outline: 2px solid var(--color-amber);
+  outline-offset: 2px;
+}
+
 /* 7. Canvas & SVG Wheel Container */
 .scene-container {
   position: fixed;
