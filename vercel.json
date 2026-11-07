@@ -1,5 +1,8 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "outputDirectory": ".",
+  "buildCommand": null,
   "cleanUrls": false,
   "trailingSlash": false,
   "rewrites": [
@@ -120,7 +123,7 @@
       ]
     },
     {
-      "source": "/(.*).html",
+      "source": "/(.*)\\.html",
       "headers": [
         {
           "key": "Content-Type",
@@ -133,7 +136,7 @@
       ]
     },
     {
-      "source": "/(.*).css",
+      "source": "/(.*)\\.css",
       "headers": [
         {
           "key": "Content-Type",
@@ -146,7 +149,7 @@
       ]
     },
     {
-      "source": "/(.*).(js|mjs)",
+      "source": "/(.*)\\.(js|mjs)",
       "headers": [
         {
           "key": "Content-Type",
@@ -159,7 +162,7 @@
       ]
     },
     {
-      "source": "/(.*).woff2",
+      "source": "/(.*)\\.woff2",
       "headers": [
         {
           "key": "Content-Type",
