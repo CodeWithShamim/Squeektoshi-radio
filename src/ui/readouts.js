@@ -123,3 +123,4 @@ export class ReadoutsManager {
     this.settlementRows.forEach((r) => this.elements.settlementList.appendChild(r));
   }
 }
+
