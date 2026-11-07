@@ -64,3 +64,4 @@ captureProof().catch((err) => {
   console.error('Error capturing proof:', err);
   process.exit(1);
 });
+

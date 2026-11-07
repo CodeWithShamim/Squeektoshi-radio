@@ -17,6 +17,26 @@
     {
       "source": "/demo",
       "destination": "/app.html?demo"
+    },
+    {
+      "source": "/orchestra",
+      "destination": "/app.html?mode=orchestra"
+    },
+    {
+      "source": "/replay",
+      "destination": "/app.html?mode=replay"
+    },
+    {
+      "source": "/band",
+      "destination": "/app.html?mode=band"
+    },
+    {
+      "source": "/console",
+      "destination": "/app.html?console=1"
+    },
+    {
+      "source": "/diagnostics",
+      "destination": "/app.html?diag=1"
     }
   ],
   "headers": [

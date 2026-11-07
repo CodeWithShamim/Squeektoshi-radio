@@ -32,7 +32,16 @@ const server = http.createServer((req, res) => {
 
   if (pathname === '/') {
     pathname = '/index.html';
-  } else if (pathname === '/app' || pathname === '/overlay' || pathname === '/demo') {
+  } else if (
+    pathname === '/app' ||
+    pathname === '/overlay' ||
+    pathname === '/demo' ||
+    pathname === '/orchestra' ||
+    pathname === '/replay' ||
+    pathname === '/band' ||
+    pathname === '/console' ||
+    pathname === '/diagnostics'
+  ) {
     pathname = '/app.html';
   }
 
