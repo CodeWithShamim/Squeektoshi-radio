@@ -4,10 +4,6 @@
    Palette: Ink #0b0b0e, Bone #e9e6dc, Signal Amber #ffb23e, Data Blue #5b8cff
    ========================================================================== */
 
-@import url('tokens.css');
-@import url('console.css');
-@import url('share.css');
-
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
@@ -1001,7 +997,41 @@ body.app-body {
   height: 8px;
 }
 
+/* HUD telemetry value badges */
+.hud-val {
+  color: var(--color-bone);
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-val.amber {
+  color: var(--color-amber);
+}
+
+.hud-val.live {
+  color: var(--color-amber);
+}
+
+.hud-val.data-blue {
+  color: var(--color-blue);
+}
+
 /* 5. OBS / Stream Overlay Mode (?overlay=1) */
+.overlay-container {
+  display: none;
+}
+
+body.overlay-mode .overlay-container {
+  display: flex;
+  align-items: center;
+}
+
+.overlay-wheel {
+  width: 120px;
+  height: 120px;
+}
+
 body.overlay-mode {
   background: transparent !important;
   background-image: none !important;
