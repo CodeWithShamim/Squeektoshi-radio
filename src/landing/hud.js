@@ -125,3 +125,4 @@ export function initHUD(onTelemetryUpdate) {
 
   return () => clearInterval(pollInterval);
 }
+
