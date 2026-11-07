@@ -148,7 +148,8 @@ body.app-body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  position: relative;
+  position: sticky;
+  top: 0;
   z-index: 20;
 }
 
@@ -422,7 +423,8 @@ body.app-body {
   align-items: center;
   justify-content: space-between;
   gap: 2rem;
-  position: relative;
+  position: sticky;
+  bottom: 0;
   z-index: 20;
   background-color: #0b0b0f;
   box-shadow: 0 -2px 16px rgba(0, 0, 0, 0.45);
