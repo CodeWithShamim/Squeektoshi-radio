@@ -32,6 +32,8 @@ const server = http.createServer((req, res) => {
 
   if (pathname === '/') {
     pathname = '/index.html';
+  } else if (pathname === '/app' || pathname === '/overlay' || pathname === '/demo') {
+    pathname = '/app.html';
   }
 
   const filePath = path.join(__dirname, pathname);
@@ -64,8 +66,9 @@ const server = http.createServer((req, res) => {
 
 server.listen(PORT, () => {
   console.log(`\n🐹 Squeektoshi Radio is running at:`);
-  console.log(`   ➜ Local:    http://localhost:${PORT}/`);
-  console.log(`   ➜ Demo:     http://localhost:${PORT}/?demo`);
-  console.log(`   ➜ Overlay:  http://localhost:${PORT}/?overlay=1\n`);
+  console.log(`   ➜ Landing:  http://localhost:${PORT}/`);
+  console.log(`   ➜ Station:  http://localhost:${PORT}/app`);
+  console.log(`   ➜ Demo:     http://localhost:${PORT}/app?demo`);
+  console.log(`   ➜ Overlay:  http://localhost:${PORT}/app?overlay=1\n`);
 });
 

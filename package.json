@@ -4,13 +4,15 @@
   "description": "Hamster-powered generative music station running entirely in the browser on Squeekchain PoW telemetry",
   "type": "module",
   "scripts": {
+    "build": "echo 'Static build ready'",
     "test": "node --test tests/*.test.js",
     "test:unit": "node --test tests/mapping.test.js tests/replay.test.js tests/api.test.js",
     "test:e2e": "npx playwright test",
     "test:a11y": "node tests/audit-a11y.js",
     "test:drift": "node tests/measure-audio-drift.js",
     "start": "node server.js",
-    "card": "node tools/make-card.js"
+    "card": "node tools/make-card.js",
+    "headline": "node tools/make-headline.js"
   },
   "keywords": [
     "squeekchain",

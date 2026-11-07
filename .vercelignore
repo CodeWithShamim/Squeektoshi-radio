@@ -1,0 +1,19 @@
+# Dependencies and Git
+node_modules
+.git
+.github
+.DS_Store
+
+# Test suites and Playwright artifacts
+tests
+test-results
+playwright-report
+playwright.config.js
+
+# Local dev server & asset generation tools
+tools
+server.js
+
+# Internal campaign documentation
+docs
+

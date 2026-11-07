@@ -34,8 +34,43 @@ export function getNoiseBuffer(ctx) {
   return buffer;
 }
 
+let cachedImpulseBuffer = null;
+
+/**
+ * Prewarms the algorithmic stereo reverb impulse asynchronously.
+ * @param {number} [sampleRate=48000]
+ * @param {number} [duration=2.2]
+ * @param {number} [decay=2.5]
+ * @returns {Promise<AudioBuffer>}
+ */
+export async function prewarmReverbImpulse(sampleRate = 48000, duration = 2.2, decay = 2.5) {
+  if (cachedImpulseBuffer && cachedImpulseBuffer.sampleRate === sampleRate) {
+    return cachedImpulseBuffer;
+  }
+  const OfflineCtxClass = typeof window !== 'undefined' ? (window.OfflineAudioContext || window.webkitOfflineAudioContext) : null;
+  const length = Math.floor(sampleRate * duration);
+
+  if (OfflineCtxClass) {
+    const offlineCtx = new OfflineCtxClass(2, length, sampleRate);
+    const buffer = offlineCtx.createBuffer(2, length, sampleRate);
+    const left = buffer.getChannelData(0);
+    const right = buffer.getChannelData(1);
+
+    for (let i = 0; i < length; i++) {
+      const t = i / sampleRate;
+      const env = Math.exp(-t * decay);
+      left[i] = (Math.random() * 2 - 1) * env;
+      right[i] = (Math.random() * 2 - 1) * env;
+    }
+    cachedImpulseBuffer = buffer;
+    return buffer;
+  }
+  return null;
+}
+
 /**
  * Generates an algorithmic stereo reverb impulse response.
+ * Uses cached prewarmed buffer if available, avoiding UI thread stutter.
  * @param {AudioContext} ctx
  * @param {number} [duration=2.2] - Duration in seconds
  * @param {number} [decay=2.5] - Exponential decay rate
@@ -43,6 +78,10 @@ export function getNoiseBuffer(ctx) {
  */
 export function createReverbImpulse(ctx, duration = 2.2, decay = 2.5) {
   const sampleRate = ctx.sampleRate;
+  if (cachedImpulseBuffer && cachedImpulseBuffer.sampleRate === sampleRate) {
+    return cachedImpulseBuffer;
+  }
+
   const length = Math.floor(sampleRate * duration);
   const impulse = ctx.createBuffer(2, length, sampleRate);
   const left = impulse.getChannelData(0);
@@ -55,6 +94,7 @@ export function createReverbImpulse(ctx, duration = 2.2, decay = 2.5) {
     right[i] = (Math.random() * 2 - 1) * env;
   }
 
+  cachedImpulseBuffer = impulse;
   return impulse;
 }
 
@@ -78,6 +118,13 @@ export function playKick(ctx, dest, time, gain = 0.75) {
 
   osc.connect(gainNode);
   gainNode.connect(dest);
+
+  osc.onended = () => {
+    try {
+      osc.disconnect();
+      gainNode.disconnect();
+    } catch {}
+  };
 
   osc.start(time);
   osc.stop(time + 0.23);
@@ -107,6 +154,14 @@ export function playHiHat(ctx, dest, time, isAccented = false, gain = 0.3) {
   noise.connect(filter);
   filter.connect(gainNode);
   gainNode.connect(dest);
+
+  noise.onended = () => {
+    try {
+      noise.disconnect();
+      filter.disconnect();
+      gainNode.disconnect();
+    } catch {}
+  };
 
   noise.start(time);
   noise.stop(time + 0.07);
@@ -141,6 +196,14 @@ export function playPluck(ctx, dest, time, freq, duration = 0.35, gain = 0.5) {
   filter.connect(gainNode);
   gainNode.connect(dest);
 
+  osc.onended = () => {
+    try {
+      osc.disconnect();
+      filter.disconnect();
+      gainNode.disconnect();
+    } catch {}
+  };
+
   osc.start(time);
   osc.stop(time + duration + 0.02);
 }
@@ -173,6 +236,9 @@ export function playPad(ctx, dest, time, freqs, duration = 2.5, gain = 0.35) {
   gainNode.connect(filter);
   filter.connect(dest);
 
+  let stoppedOscs = 0;
+  const totalOscs = freqs.length * 2;
+
   freqs.forEach((freq) => {
     // Dual detuned oscillators (±6 cents) for lush chorus effect
     [-6, 6].forEach((detune) => {
@@ -181,6 +247,18 @@ export function playPad(ctx, dest, time, freqs, duration = 2.5, gain = 0.35) {
       osc.frequency.setValueAtTime(freq, time);
       osc.detune.setValueAtTime(detune, time);
       osc.connect(gainNode);
+
+      osc.onended = () => {
+        try {
+          osc.disconnect();
+          stoppedOscs++;
+          if (stoppedOscs >= totalOscs) {
+            gainNode.disconnect();
+            filter.disconnect();
+          }
+        } catch {}
+      };
+
       osc.start(time);
       osc.stop(time + duration + 0.05);
     });
@@ -222,6 +300,15 @@ export function playBell(ctx, dest, time, freq, duration = 2.0, gain = 0.55) {
 
   carrier.connect(masterGain);
   masterGain.connect(dest);
+
+  carrier.onended = () => {
+    try {
+      carrier.disconnect();
+      modulator.disconnect();
+      modGain.disconnect();
+      masterGain.disconnect();
+    } catch {}
+  };
 
   modulator.start(time);
   carrier.start(time);
@@ -267,6 +354,16 @@ export function playLead(ctx, dest, time, freq, duration = 0.3, gain = 0.45) {
   filter.connect(gainNode);
   gainNode.connect(dest);
 
+  osc.onended = () => {
+    try {
+      osc.disconnect();
+      lfo.disconnect();
+      lfoGain.disconnect();
+      filter.disconnect();
+      gainNode.disconnect();
+    } catch {}
+  };
+
   lfo.start(time);
   osc.start(time);
 
@@ -309,6 +406,16 @@ export function playMarimba(ctx, dest, time, freq, duration = 0.25, gain = 0.55)
   gain1.connect(masterGain);
   gain2.connect(masterGain);
   masterGain.connect(dest);
+
+  osc1.onended = () => {
+    try {
+      osc1.disconnect();
+      osc2.disconnect();
+      gain1.disconnect();
+      gain2.disconnect();
+      masterGain.disconnect();
+    } catch {}
+  };
 
   osc1.start(time);
   osc2.start(time);

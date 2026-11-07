@@ -4,12 +4,11 @@
  * Converts 24 hourly settlement buckets into a deterministic 2-minute composition
  * (5 seconds per hour).
  *
- * - Tertile calculation on workAdded:
- *   - 0 or lowest third -> sleep
- *   - middle third -> jog
- *   - top third -> zoomies
- * - completedBlockCount controls rhythmic busyness
- * - Deterministic playback with timeline scrubber synchronization
+ * Key Architecture Updates:
+ * - Master Audio Clock: AudioContext.currentTime is the single source of truth for audio & visuals
+ * - Unavailable/Missing Buckets: Treated as 'rest' (silence + no-data marker), NOT 'sleep'
+ * - Pause / Resume / Seek: Clean seek without leaking scheduled notes
+ * - Deterministic Output: Same input buckets always produce identical output
  */
 
 /**
@@ -22,9 +21,14 @@ export function calculateTertiles(buckets) {
     return { t1: 0, t2: 0 };
   }
 
-  const values = buckets.map((b) => Number(b.workAdded ?? 0)).sort((a, b) => a - b);
-  const n = values.length;
+  const values = buckets
+    .filter((b) => b && b.status !== 'unavailable' && b.workAdded !== null)
+    .map((b) => Number(b.workAdded ?? 0))
+    .sort((a, b) => a - b);
 
+  if (values.length === 0) return { t1: 0, t2: 0 };
+
+  const n = values.length;
   const t1 = values[Math.floor(n / 3)];
   const t2 = values[Math.floor((2 * n) / 3)];
 
@@ -65,21 +69,21 @@ export function calculateRhythmBusyness(completedBlockCount) {
 /**
  * Composes the 24-hour replay structure from buckets.
  * Pure and deterministic: same input always produces identical composition.
+ * Unavailable buckets become 'rest' (silence with no-data marker).
  * @param {Array<object>} rawBuckets
  * @returns {Array<object>} 24 planned hourly segments
  */
 export function composeDayPlan(rawBuckets) {
-  // Ensure exactly 24 buckets (pad or slice if necessary)
-  const buckets = (rawBuckets && rawBuckets.length > 0)
-    ? rawBuckets.slice(0, 24)
-    : [];
+  const buckets = rawBuckets && rawBuckets.length > 0 ? [...rawBuckets.slice(0, 24)] : [];
 
+  // Pad up to 24 if missing
   while (buckets.length < 24) {
     const dummyHour = buckets.length;
     buckets.push({
       startAt: new Date(Date.now() - (24 - dummyHour) * 3600000).toISOString(),
       endAt: new Date(Date.now() - (23 - dummyHour) * 3600000).toISOString(),
-      workAdded: 0,
+      workAdded: null,
+      status: 'unavailable',
       completedBlockCount: 0,
     });
   }
@@ -87,12 +91,14 @@ export function composeDayPlan(rawBuckets) {
   const { t1, t2 } = calculateTertiles(buckets);
 
   return buckets.map((b, index) => {
+    const isUnavailable = b.status === 'unavailable' || b.isUnavailable === true || b.workAdded === null;
     const workAdded = Number(b.workAdded ?? 0);
     const completedBlockCount = Number(b.completedBlockCount ?? 0);
-    const mood = resolveBucketMood(workAdded, t1, t2);
-    const busyness = calculateRhythmBusyness(completedBlockCount);
+    const mood = isUnavailable ? 'rest' : resolveBucketMood(workAdded, t1, t2);
+    const busyness = isUnavailable ? 0 : calculateRhythmBusyness(completedBlockCount);
 
-    let bpm = 48;
+    let bpm = 0;
+    if (mood === 'sleep') bpm = 48;
     if (mood === 'jog') bpm = 88;
     if (mood === 'zoomies') bpm = 136;
 
@@ -100,23 +106,24 @@ export function composeDayPlan(rawBuckets) {
       hourIndex: index,
       startAt: b.startAt,
       endAt: b.endAt,
-      workAdded,
+      workAdded: isUnavailable ? 0 : workAdded,
       completedBlockCount,
       mood,
+      isUnavailable,
       bpm,
       busyness,
-      durationSec: 5.0, // 5s per bucket = 120s total composition
+      durationSec: 5.0, // 5s per bucket = 120s total
     };
   });
 }
 
 /**
- * Replay Timeline Controller
+ * Replay Timeline Controller using AudioContext.currentTime as master clock.
  */
 export class ReplayPlayer {
   /**
    * @param {AudioEngine} audioEngine
-   * @param {(hourIndex: number, planItem: object) => void} onTick
+   * @param {(hourIndex: number, planItem: object, progressFrac: number) => void} onTick
    * @param {() => void} onComplete
    */
   constructor(audioEngine, onTick = () => {}, onComplete = () => {}) {
@@ -127,7 +134,9 @@ export class ReplayPlayer {
     this.plan = [];
     this.currentHour = 0;
     this.isPlaying = false;
-    this.timerId = null;
+    this.isPaused = false;
+    this.startTime = 0;
+    this.checkIntervalId = null;
   }
 
   /**
@@ -144,46 +153,103 @@ export class ReplayPlayer {
    */
   async play(startHour = 0) {
     if (this.plan.length === 0) return;
+    this.currentHour = Math.max(0, Math.min(23, startHour));
     this.isPlaying = true;
-    this.currentHour = startHour;
+    this.isPaused = false;
 
     await this.audioEngine.start();
-    this.advanceHour();
+    this.audioEngine.setMode('replay');
+
+    // Anchor master audio clock
+    const ctx = this.audioEngine.ctx;
+    this.startTime = ctx ? ctx.currentTime - this.currentHour * 5.0 : 0;
+
+    this.applyHourTelemetry(this.currentHour);
+
+    // Audio-clock synchronization loop (evaluates every 50ms)
+    if (this.checkIntervalId) clearInterval(this.checkIntervalId);
+    this.checkIntervalId = setInterval(() => this.syncAudioClock(), 50);
   }
 
-  advanceHour() {
-    if (!this.isPlaying) return;
+  syncAudioClock() {
+    if (!this.isPlaying || this.isPaused || !this.audioEngine.ctx) return;
 
-    if (this.currentHour >= this.plan.length) {
+    const ctx = this.audioEngine.ctx;
+    const elapsedSec = ctx.currentTime - this.startTime;
+    const targetHour = Math.floor(elapsedSec / 5.0);
+    const progressFrac = Math.min(1.0, (elapsedSec % 5.0) / 5.0);
+
+    if (targetHour >= 24) {
       this.stop();
       this.onComplete();
       return;
     }
 
-    const item = this.plan[this.currentHour];
+    if (targetHour !== this.currentHour && targetHour >= 0 && targetHour < 24) {
+      this.currentHour = targetHour;
+      this.applyHourTelemetry(this.currentHour);
+    }
 
-    // Feed hour telemetry into audio engine
-    this.audioEngine.updateTelemetry({
-      isAvailable: true,
-      freshness: 'online',
-      isSpinning: item.mood !== 'sleep',
-      rpm: item.mood === 'sleep' ? 0 : item.mood === 'jog' ? 38 : 78,
-      blockHeight: 1200 + this.currentHour,
-      blockProgressRatio: Math.min(1.0, (item.completedBlockCount % 10) / 10),
-    });
+    const currentItem = this.plan[this.currentHour] || this.plan[0];
+    this.onTick(this.currentHour, currentItem, progressFrac);
+  }
 
-    this.onTick(this.currentHour, item);
+  applyHourTelemetry(hourIndex) {
+    const item = this.plan[hourIndex];
+    if (!item) return;
 
-    this.currentHour++;
-    this.timerId = setTimeout(() => this.advanceHour(), 5000); // 5s per hour
+    if (item.mood === 'rest') {
+      // Silence / rest hour
+      this.audioEngine.updateTelemetry({
+        isAvailable: false,
+        freshness: 'unavailable',
+        isSpinning: false,
+        rpm: 0,
+        blockHeight: 1200 + hourIndex,
+        blockProgressRatio: 0,
+      });
+    } else {
+      this.audioEngine.updateTelemetry({
+        isAvailable: true,
+        freshness: 'online',
+        isSpinning: item.mood !== 'sleep',
+        rpm: item.mood === 'sleep' ? 0 : item.mood === 'jog' ? 38 : 78,
+        blockHeight: 1200 + hourIndex,
+        blockProgressRatio: Math.min(1.0, (item.completedBlockCount % 10) / 10),
+      });
+    }
+  }
+
+  seek(hourIndex) {
+    const h = Math.max(0, Math.min(23, hourIndex));
+    this.currentHour = h;
+    if (this.audioEngine.ctx) {
+      this.startTime = this.audioEngine.ctx.currentTime - h * 5.0;
+    }
+    this.applyHourTelemetry(h);
+    const item = this.plan[h];
+    if (item) this.onTick(h, item, 0);
+  }
+
+  pause() {
+    this.isPaused = true;
+  }
+
+  resume() {
+    if (!this.isPaused) return;
+    this.isPaused = false;
+    if (this.audioEngine.ctx) {
+      this.startTime = this.audioEngine.ctx.currentTime - this.currentHour * 5.0;
+    }
   }
 
   stop() {
     this.isPlaying = false;
-    if (this.timerId) {
-      clearTimeout(this.timerId);
-      this.timerId = null;
+    this.isPaused = false;
+    if (this.checkIntervalId) {
+      clearInterval(this.checkIntervalId);
+      this.checkIntervalId = null;
     }
+    this.audioEngine.setMode('live');
   }
 }
-

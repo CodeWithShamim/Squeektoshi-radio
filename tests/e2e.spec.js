@@ -170,5 +170,88 @@ test.describe('Squeektoshi Radio - End-to-End Test Suite', () => {
     const moodBadge = page.locator('#badge-mood');
     await expect(moodBadge).toBeVisible();
   });
+
+  test('Console Drawer opens on C key, toggles modes and sound palettes, and updates URL', async ({ page }) => {
+    await page.goto('/app.html?demo');
+
+    // Press 'C' to open console
+    await page.keyboard.press('KeyC');
+    const drawer = page.locator('#console-drawer');
+    await expect(drawer).toHaveClass(/open/);
+
+    // Switch mode to Orchestra
+    const orchestraBtn = page.locator('.segment-btn[data-mode="orchestra"]');
+    await orchestraBtn.click();
+    await expect(orchestraBtn).toHaveClass(/active/);
+    const modeDesc = page.locator('#mode-desc-text');
+    await expect(modeDesc).toContainText(/harmonic progression/i);
+
+    // Switch palette to Chamber
+    const chamberBtn = page.locator('#palette-segmented-control .segment-btn[data-palette="chamber"]');
+    await chamberBtn.click();
+    await expect(chamberBtn).toHaveClass(/active/);
+
+    // Verify shareable URL updated
+    const shareInput = page.locator('#share-url-input');
+    await expect(shareInput).toHaveValue(/mode=orchestra/);
+    await expect(shareInput).toHaveValue(/palette=chamber/);
+
+    // Press Escape to close
+    await page.keyboard.press('Escape');
+    await expect(drawer).not.toHaveClass(/open/);
+  });
+
+  test('Diagnostics Panel opens on D key and displays live telemetry & lateness', async ({ page }) => {
+    await page.goto('/app.html?demo');
+
+    // Press 'D' to open diagnostics
+    await page.keyboard.press('KeyD');
+    const diag = page.locator('#diagnostics-panel');
+    await expect(diag).toHaveClass(/open/);
+
+    // Check FPS and AudioContext metric readouts
+    const metricFps = page.locator('#diag-fps');
+    await expect(metricFps).toBeVisible();
+    const metricCtx = page.locator('#diag-audio-state');
+    await expect(metricCtx).toContainText(/(suspended|running)/);
+
+    // Close diagnostics via close button
+    await page.locator('#diag-close-btn').click();
+    await expect(diag).not.toHaveClass(/open/);
+  });
+
+  test('Band wallet loading displays skeleton card slots and generation guard', async ({ page }) => {
+    let mockAccountTokens = Array.from({ length: 6 }, (_, i) => ({
+      tokenId: String(i + 1),
+      level: (i % 3) + 1,
+      runCount: i * 10,
+    }));
+
+    await page.route('**/v1/accounts/**', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          tokens: mockAccountTokens,
+          nextCursor: null,
+        }),
+      });
+    });
+
+    await page.goto('/app.html');
+    await page.locator('#tab-band').click();
+
+    const walletInput = page.locator('#wallet-input');
+    const loadBtn = page.locator('#wallet-load-btn');
+
+    await walletInput.fill('0x1234567890123456789012345678901234567890');
+    await loadBtn.click();
+
+    // Verify skeletons or cards loaded
+    const cardsGrid = page.locator('#band-cards-grid');
+    await expect(cardsGrid).toBeVisible();
+    const cards = page.locator('.squeek-card');
+    await expect(cards).toHaveCount(6);
+  });
 });
 

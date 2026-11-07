@@ -64,7 +64,11 @@ export async function apiFetch(path, options = {}) {
       // Handle Rate Limit (429) or Service Busy (503)
       if ((response.status === 429 || response.status === 503) && attempt < maxRetries) {
         const retryAfterHeader = response.headers.get('retry-after');
-        const waitSec = retryAfterHeader ? Math.max(1, parseInt(retryAfterHeader, 10) || 2) : Math.pow(2, attempt);
+        const jitter = Math.random() * 0.3;
+        const waitSec = (retryAfterHeader ? Math.max(1, parseInt(retryAfterHeader, 10) || 2) : Math.pow(2, attempt)) + jitter;
+        if (options.onRateLimit) {
+          options.onRateLimit('Waiting for the API rate limit');
+        }
         await new Promise((resolve) => setTimeout(resolve, waitSec * 1000));
         continue;
       }
@@ -289,7 +293,73 @@ export function parseAccount(raw) {
 }
 
 /**
- * Fetch all Squeek tokens for a wallet address, handling pagination up to 100 tokens.
+ * Concurrency limiter to prevent API 429 rate limits.
+ * Caps simultaneous in-flight requests (default: 4).
+ */
+export class ConcurrencyLimiter {
+  constructor(maxConcurrency = 4) {
+    this.maxConcurrency = maxConcurrency;
+    this.running = 0;
+    this.queue = [];
+  }
+
+  async run(task) {
+    if (this.running >= this.maxConcurrency) {
+      await new Promise((resolve) => this.queue.push(resolve));
+    }
+    this.running++;
+    try {
+      return await task();
+    } finally {
+      this.running--;
+      if (this.queue.length > 0) {
+        const next = this.queue.shift();
+        next();
+      }
+    }
+  }
+}
+
+export const metadataLimiter = new ConcurrencyLimiter(4);
+
+const METADATA_TTL_MS = 60 * 60 * 1000; // 1 hour TTL
+const memoryMetadataCache = new Map();
+
+function getCachedMetadata(tokenId) {
+  const idStr = String(tokenId);
+  const mem = memoryMetadataCache.get(idStr);
+  if (mem && Date.now() - mem.timestamp < METADATA_TTL_MS) {
+    return mem.data;
+  }
+  try {
+    if (typeof sessionStorage !== 'undefined') {
+      const raw = sessionStorage.getItem(`sqk_meta_${idStr}`);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && Date.now() - parsed.timestamp < METADATA_TTL_MS) {
+          memoryMetadataCache.set(idStr, parsed);
+          return parsed.data;
+        }
+      }
+    }
+  } catch {}
+  return null;
+}
+
+function setCachedMetadata(tokenId, data) {
+  const idStr = String(tokenId);
+  const item = { timestamp: Date.now(), data };
+  memoryMetadataCache.set(idStr, item);
+  try {
+    if (typeof sessionStorage !== 'undefined') {
+      sessionStorage.setItem(`sqk_meta_${idStr}`, JSON.stringify(item));
+    }
+  } catch {}
+}
+
+/**
+ * Fetch all Squeek tokens for a wallet address, handling pagination up to 100 tokens,
+ * sequential cursor following, and 409 cursor_invalidated restart.
  * @param {string} address
  * @param {object} [options]
  * @returns {Promise<Array>}
@@ -303,59 +373,105 @@ export async function fetchAllAccountTokens(address, options = {}) {
   const allTokens = [];
   let cursor = null;
   const maxTokens = 100;
+  let restarted = false;
 
-  do {
+  while (true) {
     const query = new URLSearchParams({ limit: '25' });
     if (cursor) query.set('cursor', cursor);
 
-    const data = await apiFetch(`/v1/accounts/${address.toLowerCase()}?${query.toString()}`, options);
+    let data;
+    try {
+      data = await apiFetch(`/v1/accounts/${address.toLowerCase()}?${query.toString()}`, options);
+    } catch (err) {
+      // 409 cursor_invalidated or 400 invalid_cursor: restart from page one
+      if ((err.message?.includes('409') || err.message?.includes('400')) && !restarted && cursor !== null) {
+        cursor = null;
+        allTokens.length = 0; // restart from page 1
+        restarted = true;
+        if (options.onRateLimit) options.onRateLimit('Cursor invalidated: restarting from page one');
+        continue;
+      }
+      throw err;
+    }
+
     const parsed = parseAccount(data);
 
     if (parsed.status === 'unavailable') {
-      throw new Error(`Account data currently unavailable: ${parsed.reason}`);
+      const unavailableResult = [];
+      unavailableResult.isUnavailable = true;
+      unavailableResult.reason = parsed.reason;
+      return unavailableResult;
     }
 
     allTokens.push(...parsed.tokens);
     cursor = parsed.nextCursor;
 
-    if (allTokens.length >= maxTokens) {
+    if (options.onProgress) {
+      options.onProgress(allTokens.length, Math.min(maxTokens, allTokens.length + (cursor ? 25 : 0)));
+    }
+
+    if (cursor === null || allTokens.length >= maxTokens) {
       break;
     }
-  } while (cursor !== null);
+  }
 
   return allTokens.slice(0, maxTokens);
 }
 
 /**
- * Fetch Squeek metadata with fallback for image.
+ * Fetch Squeek metadata with concurrency limiter, TTL cache and untrusted data sanitization.
  * @param {string|number} tokenId
  * @param {object} [options]
  * @returns {Promise<object>}
  */
 export async function fetchSqueekMetadata(tokenId, options = {}) {
-  try {
-    const raw = await apiFetch(`/v1/squeeks/${tokenId}`, options);
-    if (raw?.status === 'available' && raw?.metadata) {
-      return {
-        tokenId: String(tokenId),
-        name: raw.metadata.name || `Squeek #${tokenId}`,
-        imageDataUri: raw.metadata.imageDataUri || null,
-        attributes: raw.metadata.attributes || [],
-        level: Number(raw.level ?? 1),
-      };
-    }
-  } catch {
-    // Ignore fetch failure and return fallback
-  }
+  const idStr = String(tokenId);
+  const cached = getCachedMetadata(idStr);
+  if (cached) return cached;
 
-  // Graceful fallback to dot-grid avatar
-  return {
-    tokenId: String(tokenId),
-    name: `Squeek #${tokenId}`,
-    imageDataUri: null,
-    attributes: [],
-    level: 1,
-  };
+  return metadataLimiter.run(async () => {
+    try {
+      const raw = await apiFetch(`/v1/squeeks/${idStr}`, options);
+      if (raw?.status === 'available' && raw?.metadata) {
+        // Sanitize untrusted metadata: only allow data:image/ or https:// image URLs
+        let safeImage = null;
+        const candidateImg = raw.metadata.imageDataUri || raw.metadata.cardImageUrl;
+        if (candidateImg && (candidateImg.startsWith('data:image/') || candidateImg.startsWith('https://'))) {
+          safeImage = candidateImg;
+        }
+
+        const result = {
+          tokenId: idStr,
+          name: String(raw.metadata.name || `Squeek #${idStr}`),
+          imageDataUri: safeImage,
+          cardImageUrl: safeImage,
+          attributes: Array.isArray(raw.metadata.attributes) ? raw.metadata.attributes : [],
+          level: Number(raw.level ?? 1),
+          basePower: String(raw.basePower ?? '1000'),
+          custody: raw.custody?.owner || 'wallet',
+          nextMergeHeight: Number(raw.nextMergeHeight ?? 0),
+        };
+        setCachedMetadata(idStr, result);
+        return result;
+      }
+    } catch {
+      // Fallback on error
+    }
+
+    // Graceful fallback avatar
+    const fallback = {
+      tokenId: idStr,
+      name: `Squeek #${idStr}`,
+      imageDataUri: null,
+      cardImageUrl: null,
+      attributes: [],
+      level: 1,
+      basePower: '1000',
+      custody: 'wallet',
+      nextMergeHeight: 0,
+    };
+    return fallback;
+  });
 }
 
 /**

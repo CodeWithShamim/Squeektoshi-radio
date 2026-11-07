@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/headline.png" alt="Squeektoshi Radio Headline Banner" width="100%">
+</p>
+
 # Squeektoshi-radio 🐹📻
 
 > **Hamster-Powered Generative Music Station on Squeekchain PoW Telemetry**  
@@ -102,19 +106,42 @@ Open your browser to:
 
 ---
 
+### Keyboard Shortcuts & Professional Console
+- `Space`: Tune In / Mute toggle
+- `C`: Open / Close Professional Console Drawer (Mode selector, Sound palettes, Export clip, Shareable URL)
+- `D`: Open / Close System Diagnostics & Telemetry Panel (FPS, Lateness, Voice count, Request tracker)
+- `R`: Toggle 24-Hour Replay Day Panel
+- `B`: Toggle Squeek NFT Band Panel
+- `M`: Toggle Master Mute
+- `Escape`: Close any active drawer or panel
+
+### Diagnostic Report & Hardening
+- Complete technical diagnosis and architectural analysis: see [`docs/DIAGNOSIS.md`](docs/DIAGNOSIS.md)
+- Audio graph prewarming with `OfflineAudioContext` for instant (<150ms) start on gesture
+- Audio node garbage collection via `.disconnect()` on `source.onended`
+- Concurrency limiter (max 4 in-flight requests) and 429 jittered exponential backoff
+- Master clock synchronization via `AudioContext.currentTime` with seek & pause
+- 4 Sound Palettes with 1.2s crossfade: **Analog**, **Glass**, **Chamber**, **Dub**
+- Orchestra mode featuring chord progression downbeats, counterpoint arpeggios, and chamber bells
+
+---
+
 ## 🧪 Testing & Verification
 
-The test suite includes pure mapping tests, replay determinism tests, API parsing tests, automated WCAG accessibility audits, and Playwright end-to-end tests for both the 3D landing page and the app studio:
+The test suite includes pure mapping tests, replay determinism tests, API parsing tests, automated WCAG accessibility audits, audio scheduler drift measurements, and Playwright end-to-end tests:
 
 ```bash
-# Run all unit tests (Node.js native test runner - 21 tests)
-npm run test:unit
+# Run all unit tests (Node.js native test runner - 25 tests)
+npm test
 
-# Run Playwright end-to-end tests (mocked & live routes - 9 tests)
+# Run Playwright end-to-end tests (mocked & live routes - 13 tests)
 npm run test:e2e
 
-# Run Axe WCAG 2.1 AA accessibility audit (100/100 score)
-node tests/audit-a11y.js
+# Run Axe WCAG 2.1 AA accessibility audit across all drawer states (0 violations)
+npm run test:a11y
+
+# Run audio scheduler lateness & drift benchmark (<25ms target)
+npm run test:drift
 
 # Generate the 1200x630 social card
 npm run card
@@ -140,10 +167,13 @@ Because Squeektoshi Radio is a static site with no build requirements, deploymen
   - Framework preset: `None`
   - Build command: *(leave empty)*
   - Build output directory: `.`
-- **Vercel**:
-  - Framework preset: `Other`
-  - Build command: *(leave empty)*
-  - Output directory: `.`
+- **Vercel** *(Zero Configuration — Pre-configured via `vercel.json`)*:
+  - Connect your repository to Vercel or run `vercel` in terminal.
+  - Automatically configured:
+    - Root output directory `.` with clean rewrites (`/app`, `/overlay`, `/demo`).
+    - Optimized caching headers (fresh HTML revalidation, immutable assets, cached ES modules).
+    - Permissive Audio & CORS headers for Web Audio and OBS overlays.
+    - Lightweight `.vercelignore` to exclude local tests, tooling, and node_modules.
 - **Netlify**:
   - Build command: *(leave empty)*
   - Publish directory: `.`

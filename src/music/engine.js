@@ -6,7 +6,7 @@
  * and audio safety constraints (master gain ceiling <= 0.8).
  */
 
-import { createReverbImpulse, playBell } from './voices.js';
+import { createReverbImpulse, prewarmReverbImpulse, playBell } from './voices.js';
 import { calculateFilterCutoff } from './mapping.js';
 import { LookAheadScheduler } from './scheduler.js';
 
@@ -17,6 +17,11 @@ export class AudioEngine {
     this.isPlaying = false;
     this.isMuted = false;
     this.userVolume = 0.75;
+
+    this.isPrewarmed = false;
+    this.isPrewarming = false;
+    this.activePalette = 'analog'; // 'glass' | 'analog' | 'chamber' | 'dub'
+    this.activeMode = 'live';      // 'live' | 'replay' | 'band' | 'orchestra'
 
     // Audio Graph Nodes
     this.synthBus = null;
@@ -32,6 +37,26 @@ export class AudioEngine {
     this.scheduler = null;
     this.latestTelemetry = null;
     this.bandVoices = [];
+    this.onBufferingStateChange = null;
+  }
+
+  /**
+   * Prewarms audio assets (such as procedural reverb impulse) asynchronously
+   * before the user clicks "Tune in", ensuring click-to-sound latency <= 150ms.
+   * @returns {Promise<void>}
+   */
+  async prewarm() {
+    if (this.isPrewarmed || this.isPrewarming) return;
+    this.isPrewarming = true;
+
+    try {
+      await prewarmReverbImpulse(48000, 2.4, 2.2);
+      this.isPrewarmed = true;
+    } catch (e) {
+      console.warn('Audio prewarm fallback:', e);
+    } finally {
+      this.isPrewarming = false;
+    }
   }
 
   /**
@@ -102,8 +127,95 @@ export class AudioEngine {
       () => this.latestTelemetry,
       () => this.bandVoices
     );
+    this.scheduler.setPalette(this.activePalette);
+    this.scheduler.setMode(this.activeMode);
+    this.scheduler.onBufferingStateChange = (struggling, lateness) => {
+      if (this.onBufferingStateChange) {
+        this.onBufferingStateChange(struggling, lateness);
+      }
+    };
 
     this.isInitialized = true;
+  }
+
+  /**
+   * Crossfades sound palette over 1.2s: 'glass' | 'analog' | 'chamber' | 'dub'.
+   * @param {string} name
+   */
+  setPalette(name) {
+    const valid = ['glass', 'analog', 'chamber', 'dub'];
+    const p = valid.includes(name?.toLowerCase()) ? name.toLowerCase() : 'analog';
+    this.activePalette = p;
+
+    if (this.scheduler) {
+      this.scheduler.setPalette(p);
+    }
+
+    if (!this.ctx || !this.isInitialized) return;
+    const now = this.ctx.currentTime;
+    const transitionTime = now + 1.2; // 1.2s smooth crossfade
+
+    try {
+      switch (p) {
+        case 'glass':
+          this.reverbGain.gain.exponentialRampToValueAtTime(0.48, transitionTime);
+          this.dryGain.gain.exponentialRampToValueAtTime(0.72, transitionTime);
+          this.blockFilter.Q.linearRampToValueAtTime(0.8, transitionTime);
+          break;
+        case 'chamber':
+          this.reverbGain.gain.exponentialRampToValueAtTime(0.42, transitionTime);
+          this.dryGain.gain.exponentialRampToValueAtTime(0.78, transitionTime);
+          this.blockFilter.Q.linearRampToValueAtTime(1.2, transitionTime);
+          break;
+        case 'dub':
+          this.reverbGain.gain.exponentialRampToValueAtTime(0.55, transitionTime);
+          this.dryGain.gain.exponentialRampToValueAtTime(0.65, transitionTime);
+          this.blockFilter.Q.linearRampToValueAtTime(2.2, transitionTime);
+          break;
+        case 'analog':
+        default:
+          this.reverbGain.gain.exponentialRampToValueAtTime(0.32, transitionTime);
+          this.dryGain.gain.exponentialRampToValueAtTime(0.85, transitionTime);
+          this.blockFilter.Q.linearRampToValueAtTime(1.4, transitionTime);
+          break;
+      }
+    } catch {}
+  }
+
+  /**
+   * Sets active playback mode: 'live' | 'replay' | 'band' | 'orchestra'.
+   * @param {string} mode
+   */
+  setMode(mode) {
+    this.activeMode = mode || 'live';
+    if (this.scheduler) {
+      this.scheduler.setMode(this.activeMode);
+    }
+  }
+
+  /**
+   * Returns scheduler lateness, polyphony and audio context health metrics.
+   * @returns {object}
+   */
+  getSchedulerStats() {
+    if (!this.scheduler) {
+      return {
+        avgLatenessMs: 0,
+        maxLatenessMs: 0,
+        currentLatenessMs: 0,
+        activeVoices: 0,
+        isStruggling: false,
+        maxPolyphony: 16,
+        mode: this.activeMode,
+        palette: this.activePalette,
+        contextState: this.ctx ? this.ctx.state : 'uninitialized',
+        baseLatency: this.ctx?.baseLatency ? Number((this.ctx.baseLatency * 1000).toFixed(1)) : 0,
+      };
+    }
+    const stats = this.scheduler.getStats();
+    stats.contextState = this.ctx ? this.ctx.state : 'uninitialized';
+    stats.baseLatency = this.ctx?.baseLatency ? Number((this.ctx.baseLatency * 1000).toFixed(1)) : 0;
+    return stats;
   }
 
   /**

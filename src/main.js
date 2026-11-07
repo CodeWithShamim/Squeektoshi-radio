@@ -9,6 +9,10 @@ import {
   parseSettlements,
   parseEconomy,
   getDemoStatus,
+  fetchAllAccountTokens,
+  fetchSqueekMetadata,
+  getDemoBandTokens,
+  metadataLimiter,
 } from './api.js';
 import {
   calculateBpm,
@@ -23,8 +27,7 @@ import { ReadoutsManager } from './ui/readouts.js';
 import { BandRingManager } from './ui/band-ring.js';
 import { ReplayPlayer, composeDayPlan } from './music/replay.js';
 import { buildBandVoices } from './music/band.js';
-import { createSqueekCard } from './ui/cards.js';
-import { fetchAllAccountTokens, fetchSqueekMetadata, getDemoBandTokens } from './api.js';
+import { createSqueekCard, createCardSkeleton, pulseCardActivity } from './ui/cards.js';
 
 let visualizer = null;
 let centralDial = null;
@@ -32,6 +35,10 @@ let motionSystem = null;
 let readoutsManager = null;
 let bandRing = null;
 let replayPlayer = null;
+let bandGenerationId = 0;
+let mediaRecorder = null;
+let recordedAudioChunks = [];
+let recordTimerInterval = null;
 
 // Application State
 export const state = {
@@ -41,6 +48,11 @@ export const state = {
   isDemo: false,
   isOverlay: false,
   isChroma: false,
+  overlayVariant: 'compact',
+  activePalette: 'analog',
+  activeMode: 'live',
+  walletAddress: '',
+  spotlightToken: null,
 
   // Telemetry & Music state
   status: null,
@@ -49,6 +61,11 @@ export const state = {
   lastGoodStatus: null,
   lastSettlementCount: null,
   lastBlockHeight: null,
+
+  // Network & Diagnostics Telemetry
+  totalRequests: 0,
+  count429: 0,
+  requestLogs: [],
 
   // Timing
   demoStartTime: Date.now(),
@@ -199,6 +216,29 @@ export function updateEconomyUI(economyData) {
   }
 }
 
+function recordRequestLog(endpoint, status) {
+  state.totalRequests++;
+  const t = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  state.requestLogs.unshift({ time: t, endpoint, status });
+  if (state.requestLogs.length > 20) state.requestLogs.pop();
+
+  const logList = document.getElementById('diag-requests-log');
+  if (logList) {
+    logList.innerHTML = '';
+    state.requestLogs.forEach((log) => {
+      const li = document.createElement('li');
+      li.className = 'diag-log-item';
+      const timeSpan = document.createElement('span');
+      timeSpan.textContent = `${log.time} · ${log.endpoint}`;
+      const statusStrong = document.createElement('strong');
+      statusStrong.textContent = String(log.status);
+      li.appendChild(timeSpan);
+      li.appendChild(statusStrong);
+      logList.appendChild(li);
+    });
+  }
+}
+
 /**
  * Polls status from API or generator.
  */
@@ -214,6 +254,7 @@ async function pollStatus() {
     }
 
     const raw = await apiFetch('/v1/status');
+    recordRequestLog('/v1/status', '200 OK');
     const parsed = parseStatus(raw);
 
     if (parsed.isAvailable) {
@@ -254,6 +295,7 @@ async function pollEconomy() {
   }
   try {
     const raw = await apiFetch('/v1/economy/state');
+    recordRequestLog('/v1/economy/state', '200 OK');
     const parsed = parseEconomy(raw);
     if (parsed.status === 'available') {
       state.economy = parsed;
@@ -372,11 +414,38 @@ export function renderTimeline(buckets) {
 }
 
 /**
+ * Spotlight a single token in console and solo it.
+ */
+export function spotlightToken(token) {
+  state.spotlightToken = token;
+  const tokenEl = document.getElementById('spot-token-id');
+  const lvlEl = document.getElementById('spot-level');
+  const pwrEl = document.getElementById('spot-power');
+  const custEl = document.getElementById('spot-custody');
+  const mergeEl = document.getElementById('spot-merge');
+  const soloBtn = document.getElementById('btn-solo-spotlight');
+
+  if (tokenEl) tokenEl.textContent = `#${token.tokenId}`;
+  if (lvlEl) lvlEl.textContent = `Level ${token.level}`;
+  if (pwrEl) pwrEl.textContent = `${token.numericBasePower || 1000} PWR`;
+  if (custEl) custEl.textContent = token.custody || 'wallet';
+  if (mergeEl) mergeEl.textContent = token.nextMergeHeight ? `#${token.nextMergeHeight}` : 'None';
+  if (soloBtn) soloBtn.disabled = false;
+}
+
+/**
  * Loads a set of tokens into the band and updates the UI.
  */
 export async function loadBandTokens(tokens) {
   const container = document.getElementById('band-cards-grid');
   const msgEl = document.getElementById('band-status-msg');
+
+  if (tokens?.isUnavailable) {
+    if (msgEl) {
+      msgEl.textContent = 'Signal unknown. Preserving last known band.';
+    }
+    return;
+  }
 
   if (tokens && tokens.length > 0) {
     const voices = buildBandVoices(tokens);
@@ -385,6 +454,28 @@ export async function loadBandTokens(tokens) {
     if (bandRing) {
       bandRing.setTokens(tokens);
     }
+
+    if (container) {
+      container.style.display = 'grid';
+      container.innerHTML = '';
+      tokens.forEach((t) => {
+        const card = createSqueekCard(t, (selected) => spotlightToken(selected));
+        container.appendChild(card);
+
+        // Fetch full metadata safely in background
+        fetchSqueekMetadata(t.tokenId).then((meta) => {
+          if (meta) {
+            t.metadata = meta;
+            const updatedCard = createSqueekCard(t, (selected) => spotlightToken(selected));
+            const existing = document.getElementById(`squeek-card-${t.tokenId}`);
+            if (existing && existing.parentNode) {
+              existing.parentNode.replaceChild(updatedCard, existing);
+            }
+          }
+        }).catch(() => {});
+      });
+    }
+
     if (msgEl) {
       msgEl.textContent = `Band active: ${voices.length} Squeek instrument(s) seated on the dial.`;
     }
@@ -392,6 +483,10 @@ export async function loadBandTokens(tokens) {
     audioEngine.setBandVoices([]);
     if (bandRing) {
       bandRing.setTokens([]);
+    }
+    if (container) {
+      container.innerHTML = '';
+      container.style.display = 'none';
     }
     if (msgEl) {
       msgEl.textContent = 'No Squeeks at this address.';
@@ -430,22 +525,53 @@ function setupBandControls() {
         return;
       }
 
+      state.walletAddress = address;
+      const currentGen = ++bandGenerationId;
+
       loadBtn.disabled = true;
       loadBtn.textContent = 'Loading...';
+
+      // Render honest card skeletons
+      const container = document.getElementById('band-cards-grid');
+      if (container) {
+        container.style.display = 'grid';
+        container.innerHTML = '';
+        for (let i = 0; i < 4; i++) {
+          container.appendChild(createCardSkeleton(i));
+        }
+      }
+
       if (msgEl) {
         msgEl.textContent = `Fetching Squeeks for ${address.slice(0, 8)}...`;
       }
 
       try {
-        const tokens = await fetchAllAccountTokens(address);
+        const tokens = await fetchAllAccountTokens(address, {
+          onProgress: (loaded, total) => {
+            if (currentGen === bandGenerationId && msgEl) {
+              msgEl.textContent = `Fetching Squeeks... (${loaded} of ${total})`;
+            }
+          },
+          onRateLimit: (statusText) => {
+            if (currentGen === bandGenerationId && msgEl) {
+              msgEl.textContent = statusText;
+            }
+          },
+        });
+
+        // Ignore stale responses from earlier queries
+        if (currentGen !== bandGenerationId) return;
+
         await loadBandTokens(tokens);
       } catch (err) {
-        if (msgEl) {
+        if (currentGen === bandGenerationId && msgEl) {
           msgEl.textContent = 'Could not reach the Squeekchain API. Retrying.';
         }
       } finally {
-        loadBtn.disabled = false;
-        loadBtn.textContent = 'Load Squeeks';
+        if (currentGen === bandGenerationId) {
+          loadBtn.disabled = false;
+          loadBtn.textContent = 'Load Squeeks';
+        }
       }
     };
 
@@ -466,8 +592,299 @@ function setupBandControls() {
 }
 
 /**
- * Setup Replay Controls and Mode Tabs.
+ * Updates the shareable station URL in the console.
  */
+export function updateShareUrl() {
+  const input = document.getElementById('share-url-input');
+  if (!input) return;
+  const url = new URL(window.location.href);
+  url.searchParams.set('palette', state.activePalette);
+  url.searchParams.set('mode', state.activeMode);
+  if (state.walletAddress) {
+    url.searchParams.set('wallet', state.walletAddress);
+  } else {
+    url.searchParams.delete('wallet');
+  }
+  input.value = url.toString();
+}
+
+/**
+ * Setup Professional Features Console Drawer.
+ */
+function setupConsoleDrawer() {
+  const drawer = document.getElementById('console-drawer');
+  const openBtn = document.getElementById('btn-open-console');
+  const closeBtn = document.getElementById('console-close-btn');
+
+  const toggleConsole = (forceOpen) => {
+    if (!drawer) return;
+    const shouldOpen = typeof forceOpen === 'boolean' ? forceOpen : !drawer.classList.contains('open');
+    drawer.classList.toggle('open', shouldOpen);
+    drawer.setAttribute('aria-hidden', String(!shouldOpen));
+    if (openBtn) openBtn.setAttribute('aria-expanded', String(shouldOpen));
+    if (shouldOpen) updateShareUrl();
+  };
+
+  if (openBtn) openBtn.addEventListener('click', () => toggleConsole());
+  if (closeBtn) closeBtn.addEventListener('click', () => toggleConsole(false));
+
+  // Mode Segmented Control
+  const modeButtons = document.querySelectorAll('#mode-segmented-control .segment-btn');
+  const descEl = document.getElementById('mode-desc-text');
+  const descMap = {
+    live: 'Live telemetry from the WHEELY9000 hamster wheel on Sepolia.',
+    replay: '24-hour symphony replay composed deterministically from settlement buckets.',
+    band: 'Synthesized instrument band mapped from your wallet Squeek NFTs.',
+    orchestra: 'Expansive harmonic progression with foreground pad chords and counterpoint arpeggios.',
+  };
+
+  modeButtons.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      modeButtons.forEach((b) => {
+        b.classList.remove('active');
+        b.setAttribute('aria-selected', 'false');
+      });
+      btn.classList.add('active');
+      btn.setAttribute('aria-selected', 'true');
+
+      const mode = btn.dataset.mode;
+      state.activeMode = mode;
+      audioEngine.setMode(mode);
+
+      if (descEl) descEl.textContent = descMap[mode] || '';
+
+      const replayPanel = document.getElementById('replay-panel');
+      const bandSection = document.getElementById('band-section');
+      if (replayPanel) replayPanel.classList.toggle('open', mode === 'replay');
+      if (bandSection) bandSection.classList.toggle('open', mode === 'band');
+
+      updateShareUrl();
+    });
+  });
+
+  // Sound Palette Segmented Control (1.2s crossfade)
+  const paletteButtons = document.querySelectorAll('#palette-segmented-control .segment-btn');
+  const palDescEl = document.getElementById('palette-desc-text');
+  const palDescMap = {
+    analog: 'Analog: Warm tape-saturation vibe, lower filter base (300Hz), rich Q (1.4).',
+    glass: 'Glass: Shimmering crystalline harmonics, bright filter (600Hz), sparkling FM bells.',
+    chamber: 'Chamber: Expansive acoustic hall sustain, 42% wet reverb, rich dynamic expression.',
+    dub: 'Dub: Deep sub-bass foundation, dark cutoff (220Hz), high resonance (2.2), heavy ducking.',
+  };
+
+  paletteButtons.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      paletteButtons.forEach((b) => {
+        b.classList.remove('active');
+        b.setAttribute('aria-checked', 'false');
+      });
+      btn.classList.add('active');
+      btn.setAttribute('aria-checked', 'true');
+
+      const pal = btn.dataset.palette;
+      state.activePalette = pal;
+      audioEngine.setPalette(pal);
+      try {
+        localStorage.setItem('sqk_palette', pal);
+      } catch {}
+
+      if (palDescEl) palDescEl.textContent = palDescMap[pal] || '';
+      updateShareUrl();
+    });
+  });
+
+  // Share Copy Button
+  const copyBtn = document.getElementById('share-copy-btn');
+  const feedback = document.getElementById('share-feedback');
+  if (copyBtn) {
+    copyBtn.addEventListener('click', async () => {
+      const input = document.getElementById('share-url-input');
+      if (input && navigator.clipboard) {
+        try {
+          await navigator.clipboard.writeText(input.value);
+          if (feedback) {
+            feedback.style.display = 'block';
+            setTimeout(() => { feedback.style.display = 'none'; }, 2000);
+          }
+        } catch {}
+      }
+    });
+  }
+
+  // Squeek Spotlight Solo Voice Button
+  const soloBtn = document.getElementById('btn-solo-spotlight');
+  if (soloBtn) {
+    soloBtn.addEventListener('click', () => {
+      if (state.spotlightToken) {
+        const isCurrentlySoloed = soloBtn.classList.toggle('active-solo');
+        soloBtn.textContent = isCurrentlySoloed ? 'Unsolo Squeek' : 'Solo This Squeek';
+        if (isCurrentlySoloed) {
+          audioEngine.setBandVoices(buildBandVoices([state.spotlightToken]));
+        } else {
+          audioEngine.setBandVoices(buildBandVoices(state.status?.tokens || []));
+        }
+      }
+    });
+  }
+}
+
+/**
+ * Setup System Diagnostics Panel (D key or button).
+ */
+function setupDiagnosticsPanel() {
+  const panel = document.getElementById('diagnostics-panel');
+  const openBtn = document.getElementById('btn-open-diag');
+  const closeBtn = document.getElementById('diag-close-btn');
+
+  const toggleDiag = (forceOpen) => {
+    if (!panel) return;
+    const shouldOpen = typeof forceOpen === 'boolean' ? forceOpen : !panel.classList.contains('open');
+    panel.classList.toggle('open', shouldOpen);
+    panel.setAttribute('aria-hidden', String(!shouldOpen));
+    if (openBtn) openBtn.setAttribute('aria-expanded', String(shouldOpen));
+  };
+
+  if (openBtn) openBtn.addEventListener('click', () => toggleDiag());
+  if (closeBtn) closeBtn.addEventListener('click', () => toggleDiag(false));
+
+  // Periodic metrics refresh
+  setInterval(() => {
+    if (!panel || !panel.classList.contains('open')) return;
+
+    const stats = audioEngine.getSchedulerStats();
+    const audioStateEl = document.getElementById('diag-audio-state');
+    const audioLatencyEl = document.getElementById('diag-audio-latency');
+    const schedLatenessEl = document.getElementById('diag-sched-lateness');
+    const schedAvgEl = document.getElementById('diag-sched-avg');
+    const activeVoicesEl = document.getElementById('diag-active-voices');
+    const totalReqsEl = document.getElementById('diag-total-requests');
+    const count429El = document.getElementById('diag-429-count');
+    const concurrencyEl = document.getElementById('diag-active-concurrency');
+
+    if (audioStateEl) audioStateEl.textContent = stats.contextState;
+    if (audioLatencyEl) audioLatencyEl.textContent = `latency: ${stats.baseLatency}ms`;
+    if (schedLatenessEl) schedLatenessEl.textContent = `${stats.currentLatenessMs.toFixed(2)} ms`;
+    if (schedAvgEl) schedAvgEl.textContent = `avg: ${stats.avgLatenessMs.toFixed(2)}ms · max: ${stats.maxLatenessMs.toFixed(2)}ms`;
+    if (activeVoicesEl) activeVoicesEl.textContent = `${stats.activeVoices} / ${stats.maxPolyphony}`;
+    if (totalReqsEl) totalReqsEl.textContent = String(state.totalRequests);
+    if (count429El) count429El.textContent = String(state.count429);
+    if (concurrencyEl) concurrencyEl.textContent = `${metadataLimiter.running} / 4`;
+  }, 500);
+}
+
+/**
+ * Setup Export Audio Clip (up to 30s master output).
+ */
+function setupExportClip() {
+  const btn = document.getElementById('btn-export-clip');
+  const timer = document.getElementById('export-timer');
+  const link = document.getElementById('export-download-link');
+  const statusDesc = document.getElementById('export-status-desc');
+
+  if (!btn) return;
+
+  btn.addEventListener('click', async () => {
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+      mediaRecorder.stop();
+      return;
+    }
+
+    if (!audioEngine.ctx) {
+      await audioEngine.start();
+    }
+
+    if (typeof MediaRecorder === 'undefined' || !audioEngine.ctx.createMediaStreamDestination) {
+      if (statusDesc) statusDesc.textContent = 'Audio clip export not supported in this browser environment.';
+      return;
+    }
+
+    try {
+      const dest = audioEngine.ctx.createMediaStreamDestination();
+      audioEngine.masterGain.connect(dest);
+
+      recordedAudioChunks = [];
+      mediaRecorder = new MediaRecorder(dest.stream);
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) recordedAudioChunks.push(e.data);
+      };
+
+      mediaRecorder.onstop = () => {
+        clearInterval(recordTimerInterval);
+        if (timer) timer.style.display = 'none';
+        btn.textContent = '● Record Clip (30s)';
+
+        const blob = new Blob(recordedAudioChunks, { type: 'audio/webm' });
+        const url = URL.createObjectURL(blob);
+        if (link) {
+          link.href = url;
+          link.style.display = 'inline-block';
+        }
+        if (statusDesc) statusDesc.textContent = 'Recording complete. Click Download to save clip.';
+      };
+
+      mediaRecorder.start();
+      let secondsLeft = 30;
+      if (timer) {
+        timer.style.display = 'inline-block';
+        timer.textContent = `00:${String(secondsLeft).padStart(2, '0')}`;
+      }
+      btn.textContent = '■ Stop Recording';
+      if (statusDesc) statusDesc.textContent = 'Recording active master audio... (max 30s)';
+
+      recordTimerInterval = setInterval(() => {
+        secondsLeft--;
+        if (timer) timer.textContent = `00:${String(Math.max(0, secondsLeft)).padStart(2, '0')}`;
+        if (secondsLeft <= 0) {
+          clearInterval(recordTimerInterval);
+          if (mediaRecorder.state === 'recording') mediaRecorder.stop();
+        }
+      }, 1000);
+    } catch (err) {
+      if (statusDesc) statusDesc.textContent = 'Could not initialize recording: ' + err.message;
+    }
+  });
+}
+
+/**
+ * Setup OBS Stream Overlay Variants.
+ */
+function setupOverlayVariants() {
+  const variantButtons = document.querySelectorAll('#overlay-variant-control .segment-btn');
+  const obsInput = document.getElementById('obs-url-input');
+  const copyBtn = document.getElementById('obs-copy-btn');
+
+  const updateObsUrl = () => {
+    if (!obsInput) return;
+    const url = new URL(window.location.origin + window.location.pathname);
+    url.searchParams.set('overlay', '1');
+    if (state.overlayVariant !== 'compact') {
+      url.searchParams.set('variant', state.overlayVariant);
+    }
+    obsInput.value = url.toString();
+  };
+
+  variantButtons.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      variantButtons.forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+      state.overlayVariant = btn.dataset.variant || 'compact';
+      updateObsUrl();
+    });
+  });
+
+  updateObsUrl();
+
+  if (copyBtn && obsInput) {
+    copyBtn.addEventListener('click', async () => {
+      if (navigator.clipboard) {
+        await navigator.clipboard.writeText(obsInput.value);
+        copyBtn.textContent = 'Copied!';
+        setTimeout(() => { copyBtn.textContent = 'Copy OBS URL'; }, 1500);
+      }
+    });
+  }
+}
 function setupReplayControls() {
   const tabReplay = document.getElementById('tab-replay');
   const replayPanel = document.getElementById('replay-panel');
@@ -562,6 +979,39 @@ export function init() {
   state.isOverlay = urlParams.get('overlay') === '1';
   state.isChroma = urlParams.get('chroma') === '1';
 
+  // Asynchronously prewarm audio graph (reverb impulse) before first click
+  audioEngine.prewarm();
+
+  // Load sound palette preference from URL or localStorage
+  let initialPalette = urlParams.get('palette');
+  if (!initialPalette) {
+    try {
+      initialPalette = localStorage.getItem('sqk_palette');
+    } catch {}
+  }
+  if (initialPalette) {
+    state.activePalette = initialPalette;
+    audioEngine.setPalette(initialPalette);
+  }
+
+  // Load mode from URL
+  const initialMode = urlParams.get('mode');
+  if (initialMode) {
+    state.activeMode = initialMode;
+    audioEngine.setMode(initialMode);
+  }
+
+  // Buffering Warning Listener
+  audioEngine.onBufferingStateChange = (struggling, lateness) => {
+    const diagNote = document.getElementById('diag-buffering-note');
+    if (diagNote) {
+      diagNote.style.display = struggling ? 'block' : 'none';
+      if (struggling) {
+        diagNote.textContent = `Audio is struggling (${lateness.toFixed(0)}ms lateness) — reducing voice density`;
+      }
+    }
+  };
+
   // Instantiate Presentation Layer
   motionSystem = new MotionSystem();
   readoutsManager = new ReadoutsManager(motionSystem);
@@ -573,8 +1023,7 @@ export function init() {
     centralDial = new CentralDial({
       onHourSelect: (h) => {
         if (replayPlayer) {
-          replayPlayer.stop();
-          replayPlayer.play(h);
+          replayPlayer.seek(h);
         }
       },
     });
@@ -624,13 +1073,21 @@ export function init() {
     });
   }
 
-  // Keyboard shortcuts (Space = Tune/Mute, R = Replay, B = Band)
+  // Keyboard shortcuts (Space = Tune/Mute, C = Console, D = Diag, R = Replay, B = Band)
   window.addEventListener('keydown', (e) => {
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
 
     if (e.code === 'Space') {
       e.preventDefault();
       toggleAudio();
+    } else if (e.code === 'KeyC') {
+      e.preventDefault();
+      const openBtn = document.getElementById('btn-open-console');
+      if (openBtn) openBtn.click();
+    } else if (e.code === 'KeyD') {
+      e.preventDefault();
+      const diagBtn = document.getElementById('btn-open-diag');
+      if (diagBtn) diagBtn.click();
     } else if (e.code === 'KeyR') {
       e.preventDefault();
       const tabReplay = document.getElementById('tab-replay');
@@ -642,25 +1099,44 @@ export function init() {
     } else if (e.code === 'KeyM') {
       e.preventDefault();
       if (elements.muteBtn) elements.muteBtn.click();
-    } else if (e.code === 'ArrowRight' && replayPlayer?.isPlaying) {
-      const nextHour = (replayPlayer.currentHourIndex + 1) % 24;
-      replayPlayer.play(nextHour);
-    } else if (e.code === 'ArrowLeft' && replayPlayer?.isPlaying) {
-      const prevHour = (replayPlayer.currentHourIndex + 23) % 24;
-      replayPlayer.play(prevHour);
+    } else if (e.code === 'Escape') {
+      const consoleDrawer = document.getElementById('console-drawer');
+      const diagPanel = document.getElementById('diagnostics-panel');
+      if (consoleDrawer) {
+        consoleDrawer.classList.remove('open');
+        consoleDrawer.setAttribute('aria-hidden', 'true');
+      }
+      if (diagPanel) {
+        diagPanel.classList.remove('open');
+        diagPanel.setAttribute('aria-hidden', 'true');
+      }
     }
   });
 
-  // Legacy Visualizer support for overlay canvas
-  const overlayWheelCanvas = document.getElementById('overlay-wheel-canvas');
-  if (overlayWheelCanvas) {
-    visualizer = new VisualizerManager(null, null, overlayWheelCanvas);
-    visualizer.start();
-  }
-
+  // Setup Feature Modules
+  setupConsoleDrawer();
+  setupDiagnosticsPanel();
+  setupExportClip();
+  setupOverlayVariants();
   setupReplayControls();
   setupBandControls();
   startPolling();
+
+  // If ?debug URL query present, open diagnostics immediately
+  if (urlParams.has('debug')) {
+    const diagBtn = document.getElementById('btn-open-diag');
+    if (diagBtn) diagBtn.click();
+  }
+
+  // If wallet parameter in URL, auto-load
+  const initialWallet = urlParams.get('wallet');
+  if (initialWallet && /^0x[0-9a-fA-F]{40}$/.test(initialWallet)) {
+    const input = document.getElementById('wallet-input');
+    if (input) {
+      input.value = initialWallet;
+      fetchAllAccountTokens(initialWallet).then(loadBandTokens).catch(() => {});
+    }
+  }
 
   // If demo mode, pre-populate demo band
   if (state.isDemo) {
@@ -670,5 +1146,9 @@ export function init() {
 
 // Automatically initialize if running in browser window
 if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-  window.addEventListener('DOMContentLoaded', init);
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
 }

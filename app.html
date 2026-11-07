@@ -5,6 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Squeektoshi Radio — Station Console</title>
   <meta name="description" content="A live generative music station running entirely in the browser, driven by Squeektoshi's hamster-wheel proof-of-work on Squeekchain.">
+  <meta property="og:title" content="Squeektoshi Radio — Station Console">
+  <meta property="og:description" content="A live generative music station running entirely in the browser, driven by Squeektoshi's hamster-wheel proof-of-work on Squeekchain.">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="/card.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Squeektoshi Radio — Station Console">
+  <meta name="twitter:description" content="A live generative music station running entirely in the browser, driven by Squeektoshi's hamster-wheel proof-of-work on Squeekchain.">
+  <meta name="twitter:image" content="/card.png">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><circle cx=%2250%22 cy=%2250%22 r=%2244%22 fill=%22none%22 stroke=%22%23ffb23e%22 stroke-width=%228%22/></svg>">
   <link rel="stylesheet" href="tokens.css">
   <link rel="stylesheet" href="app.css">
@@ -234,10 +242,14 @@
       <button id="tab-replay" class="btn-console-secondary" aria-expanded="false">Replay day</button>
       <button id="tab-band" class="btn-console-secondary" aria-expanded="false">Band</button>
       <button id="tab-live" style="display: none;">Live</button>
+      <button id="btn-open-console" class="btn-console-secondary" aria-expanded="false" title="Open Console Settings (C)">Console</button>
+      <button id="btn-open-diag" class="btn-console-secondary" aria-expanded="false" title="System Diagnostics (D)">Diag</button>
 
       <!-- Keyboard Shortcut Hints -->
       <div class="keyboard-hints" aria-hidden="true">
         <span><kbd class="kbd-tag">Space</kbd> Tune/Mute</span>
+        <span><kbd class="kbd-tag">C</kbd> Console</span>
+        <span><kbd class="kbd-tag">D</kbd> Diag</span>
         <span><kbd class="kbd-tag">R</kbd> Replay</span>
         <span><kbd class="kbd-tag">B</kbd> Band</span>
       </div>
@@ -257,6 +269,163 @@
       <div><span class="readout-label">BPM</span> <strong id="overlay-bpm">48 BPM</strong></div>
       <div><span class="readout-label">BLOCK</span> <strong id="overlay-block" style="color: var(--color-blue);">#0</strong></div>
       <div><span class="readout-label">PROG</span> <strong id="overlay-progress">0%</strong></div>
+    </div>
+  </aside>
+
+  <!-- Professional Features Console (C key or button) -->
+  <aside id="console-drawer" class="console-drawer" aria-label="Professional Station Console" aria-hidden="true">
+    <div class="console-drawer-header">
+      <span class="console-title">CONSOLE // SETTINGS</span>
+      <button id="console-close-btn" class="drawer-close-btn">CLOSE [ESC]</button>
+    </div>
+
+    <div class="console-drawer-body">
+      <!-- 1. Mode Selector -->
+      <section class="console-section">
+        <label class="console-section-label">STATION MODE</label>
+        <div class="segmented-control" role="tablist" id="mode-segmented-control">
+          <button role="tab" class="segment-btn active" data-mode="live" aria-selected="true">Live</button>
+          <button role="tab" class="segment-btn" data-mode="replay" aria-selected="false">Replay</button>
+          <button role="tab" class="segment-btn" data-mode="band" aria-selected="false">Band</button>
+          <button role="tab" class="segment-btn" data-mode="orchestra" aria-selected="false">Orchestra</button>
+        </div>
+        <p class="console-section-desc" id="mode-desc-text">Live telemetry from the WHEELY9000 hamster wheel on Sepolia.</p>
+      </section>
+
+      <!-- 2. Synthesized Sound Palettes -->
+      <section class="console-section">
+        <label class="console-section-label">SOUND PALETTE (1.2S CROSSFADE)</label>
+        <div class="segmented-control" role="radiogroup" id="palette-segmented-control">
+          <button role="radio" class="segment-btn active" data-palette="analog" aria-checked="true">Analog</button>
+          <button role="radio" class="segment-btn" data-palette="glass" aria-checked="false">Glass</button>
+          <button role="radio" class="segment-btn" data-palette="chamber" aria-checked="false">Chamber</button>
+          <button role="radio" class="segment-btn" data-palette="dub" aria-checked="false">Dub</button>
+        </div>
+        <p class="console-section-desc" id="palette-desc-text">Analog: Warm tape-saturation vibe, lower filter base (300Hz), rich Q (1.4).</p>
+      </section>
+
+      <!-- 3. Shareable State -->
+      <section class="console-section">
+        <label class="console-section-label">SHAREABLE STATION URL</label>
+        <div class="share-url-group">
+          <input type="text" id="share-url-input" class="console-input" readonly aria-label="Shareable Station URL">
+          <button id="share-copy-btn" class="btn-console-secondary">Copy link</button>
+        </div>
+        <div id="share-feedback" class="copy-feedback-msg" style="display: none;">URL copied to clipboard!</div>
+      </section>
+
+      <!-- 4. Export Audio Clip -->
+      <section class="console-section">
+        <label class="console-section-label">EXPORT AUDIO CLIP (UP TO 30S)</label>
+        <div style="display: flex; gap: 0.8rem; align-items: center;">
+          <button id="btn-export-clip" class="btn-console-secondary">● Record Clip (30s)</button>
+          <span id="export-timer" class="hud-val amber" style="font-size: 0.9rem; display: none;">00:00</span>
+          <a id="export-download-link" class="btn-console-secondary" style="display: none;" download="squeektoshi-clip.webm">Download .webm</a>
+        </div>
+        <p id="export-status-desc" class="console-section-desc">Records pure master output directly from Web Audio destination.</p>
+      </section>
+
+      <!-- 5. OBS Stream Overlay Variants -->
+      <section class="console-section">
+        <label class="console-section-label">OBS STREAM OVERLAY VARIANTS</label>
+        <div class="segmented-control" id="overlay-variant-control">
+          <button class="segment-btn active" data-variant="compact">Compact</button>
+          <button class="segment-btn" data-variant="lower-third">Lower-Third</button>
+          <button class="segment-btn" data-variant="full">Full Console</button>
+        </div>
+        <div class="share-url-group" style="margin-top: 0.5rem;">
+          <input type="text" id="obs-url-input" class="console-input" readonly aria-label="OBS Stream URL">
+          <button id="obs-copy-btn" class="btn-console-secondary">Copy OBS URL</button>
+        </div>
+      </section>
+
+      <!-- 6. Squeek Spotlight (Solo NFT voice in Band mode) -->
+      <section class="console-section" id="spotlight-section">
+        <label class="console-section-label">SQUEEK SPOTLIGHT (SOLO VOICE)</label>
+        <div id="spotlight-details" class="spotlight-box">
+          <div class="spotlight-row"><span>TOKEN ID</span> <strong id="spot-token-id">None selected</strong></div>
+          <div class="spotlight-row"><span>LEVEL</span> <strong id="spot-level">--</strong></div>
+          <div class="spotlight-row"><span>BASE POWER</span> <strong id="spot-power">--</strong></div>
+          <div class="spotlight-row"><span>CUSTODY</span> <strong id="spot-custody">--</strong></div>
+          <div class="spotlight-row"><span>NEXT MERGE</span> <strong id="spot-merge">--</strong></div>
+        </div>
+        <button id="btn-solo-spotlight" class="btn-console-secondary" style="margin-top: 0.5rem;" disabled>Solo This Squeek</button>
+      </section>
+    </div>
+  </aside>
+
+  <!-- System Diagnostics Panel (D key or button) -->
+  <aside id="diagnostics-panel" class="diagnostics-panel" aria-label="System Diagnostics" aria-hidden="true">
+    <div class="console-drawer-header">
+      <span class="console-title">DIAGNOSTICS // SYSTEM HEALTH</span>
+      <button id="diag-close-btn" class="drawer-close-btn">CLOSE [ESC]</button>
+    </div>
+    <div class="console-drawer-body">
+      <!-- Buffering Warning Note -->
+      <div id="diag-buffering-note" class="buffering-warning" style="display: none;" role="alert">
+        Audio is struggling — reducing voice density
+      </div>
+
+      <!-- Health Readouts Grid -->
+      <div class="diag-metrics-grid">
+        <div class="diag-metric-card">
+          <span class="readout-label">AUDIO CONTEXT</span>
+          <span class="diag-val" id="diag-audio-state">running</span>
+          <span class="diag-sub" id="diag-audio-latency">latency: 0.0ms</span>
+        </div>
+        <div class="diag-metric-card">
+          <span class="readout-label">SCHEDULER LATENESS</span>
+          <span class="diag-val" id="diag-sched-lateness">0.00 ms</span>
+          <span class="diag-sub" id="diag-sched-avg">avg: 0.00ms · max: 0.00ms</span>
+        </div>
+        <div class="diag-metric-card">
+          <span class="readout-label">RENDER FRAME RATE</span>
+          <span class="diag-val" id="diag-fps">60 FPS</span>
+          <span class="diag-sub">target: 60 FPS</span>
+        </div>
+        <div class="diag-metric-card">
+          <span class="readout-label">ACTIVE VOICES</span>
+          <span class="diag-val" id="diag-active-voices">0 / 16</span>
+          <span class="diag-sub" id="diag-polyphony-cap">cap: 16 voices</span>
+        </div>
+      </div>
+
+      <!-- API Endpoints Status -->
+      <section class="console-section" style="margin-top: 1rem;">
+        <label class="console-section-label">TELEMETRY ENDPOINTS HEALTH</label>
+        <div class="diag-endpoints-list">
+          <div class="endpoint-status-row">
+            <span>GET /v1/status</span>
+            <span id="endpoint-status-badge" class="hud-val live">LIVE</span>
+          </div>
+          <div class="endpoint-status-row">
+            <span>GET /v1/settlements</span>
+            <span id="endpoint-settlements-badge" class="hud-val live">LIVE</span>
+          </div>
+          <div class="endpoint-status-row">
+            <span>GET /v1/accounts/{addr}</span>
+            <span id="endpoint-accounts-badge" class="hud-val live">LIVE</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Network Request Metrics -->
+      <section class="console-section">
+        <label class="console-section-label">NETWORK METRICS & 429 TRACKER</label>
+        <div class="spotlight-box">
+          <div class="spotlight-row"><span>TOTAL REQUESTS</span> <strong id="diag-total-requests">0</strong></div>
+          <div class="spotlight-row"><span>RATE LIMITS (429)</span> <strong id="diag-429-count">0</strong></div>
+          <div class="spotlight-row"><span>ACTIVE CONCURRENCY</span> <strong id="diag-active-concurrency">0 / 4</strong></div>
+        </div>
+      </section>
+
+      <!-- Recent Requests Log -->
+      <section class="console-section">
+        <label class="console-section-label">RECENT REQUESTS LOG (LAST 20)</label>
+        <ul id="diag-requests-log" class="diag-log-list" aria-live="polite">
+          <li class="diag-log-item"><span>--:--:--</span> <span>No requests logged yet</span></li>
+        </ul>
+      </section>
     </div>
   </aside>
 
