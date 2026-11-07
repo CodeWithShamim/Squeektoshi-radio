@@ -635,12 +635,18 @@ function setupBandControls() {
   const tabBand = document.getElementById('tab-band');
   const bandSection = document.getElementById('band-section');
 
-  // Drawer Toggle
+  // Drawer / Section Toggle & Navigation
   if (tabBand && bandSection) {
+    tabBand.setAttribute('aria-expanded', 'true');
+    tabBand.style.borderColor = 'var(--color-amber)';
     tabBand.addEventListener('click', () => {
-      const isOpen = bandSection.classList.toggle('open');
-      tabBand.setAttribute('aria-expanded', String(isOpen));
-      tabBand.style.borderColor = isOpen ? 'var(--color-amber)' : 'var(--color-hairline)';
+      bandSection.classList.remove('collapsed');
+      tabBand.setAttribute('aria-expanded', 'true');
+      tabBand.style.borderColor = 'var(--color-amber)';
+      bandSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      if (input) {
+        input.focus();
+      }
     });
   }
 
@@ -657,6 +663,14 @@ function setupBandControls() {
 
       state.walletAddress = address;
       const currentGen = ++bandGenerationId;
+
+      if (bandSection) {
+        bandSection.classList.remove('collapsed');
+      }
+      if (tabBand) {
+        tabBand.setAttribute('aria-expanded', 'true');
+        tabBand.style.borderColor = 'var(--color-amber)';
+      }
 
       loadBtn.disabled = true;
       loadBtn.textContent = 'Loading...';
@@ -1948,31 +1962,38 @@ export function init() {
     }, 300);
   }
 
-  // If wallet parameter in URL, auto-load and reveal band drawer
-  const initialWallet = urlParams.get('wallet');
-  if (initialWallet && /^0x[0-9a-fA-F]{40}$/.test(initialWallet)) {
-    const input = document.getElementById('wallet-input');
-    const bandSection = document.getElementById('band-section');
-    const tabBand = document.getElementById('tab-band');
-    if (input) input.value = initialWallet;
-    if (bandSection) bandSection.classList.add('open');
-    if (tabBand) {
-      tabBand.setAttribute('aria-expanded', 'true');
-      tabBand.style.borderColor = 'var(--color-amber)';
-    }
-    fetchAllAccountTokens(initialWallet).then(loadBandTokens).catch(() => {});
-  } else if (state.activeMode === 'band') {
-    const bandSection = document.getElementById('band-section');
-    const tabBand = document.getElementById('tab-band');
-    if (bandSection) bandSection.classList.add('open');
-    if (tabBand) {
-      tabBand.setAttribute('aria-expanded', 'true');
-      tabBand.style.borderColor = 'var(--color-amber)';
-    }
-  }
+  // Default wallet address to show and fetch on visit
+  const DEFAULT_WALLET = '0x197BDAB29923e997672785d329fF063FF6591545';
+  const urlWallet = urlParams.get('wallet');
+  const targetWallet = (urlWallet && /^0x[0-9a-fA-F]{40}$/.test(urlWallet)) ? urlWallet : DEFAULT_WALLET;
 
-  // If demo mode, pre-populate demo band
-  if (state.isDemo) {
+  const input = document.getElementById('wallet-input');
+  const bandSection = document.getElementById('band-section');
+  const tabBand = document.getElementById('tab-band');
+
+  if (input) input.value = targetWallet;
+  if (bandSection) bandSection.classList.remove('collapsed');
+  if (tabBand) {
+    tabBand.setAttribute('aria-expanded', 'true');
+    tabBand.style.borderColor = 'var(--color-amber)';
+  }
+  state.walletAddress = targetWallet;
+
+  // Auto-fetch the default band tokens so Squeeks show immediately on visit
+  if (!state.isDemo) {
+    const msgEl = document.getElementById('band-status-msg');
+    if (msgEl) {
+      msgEl.textContent = `Fetching Squeeks for ${targetWallet.slice(0, 8)}...`;
+      msgEl.style.color = 'var(--color-bone-muted)';
+    }
+    fetchAllAccountTokens(targetWallet)
+      .then(async (tokens) => {
+        await loadBandTokens(tokens);
+      })
+      .catch((err) => {
+        console.warn('Default wallet band fetch:', err);
+      });
+  } else {
     loadBandTokens(getDemoBandTokens());
   }
 }
