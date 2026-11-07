@@ -20,7 +20,9 @@ async function testBandMode() {
   fs.mkdirSync(path.join(rootDir, 'tests/screenshots'), { recursive: true });
 
   try {
-    await page.goto('http://localhost:3000', { waitUntil: 'networkidle' });
+    await page.goto('http://localhost:3000/app.html', { waitUntil: 'networkidle' });
+    await page.locator('#tab-band').click();
+    await page.waitForTimeout(400);
 
     // --- TEST 1: Empty Wallet ---
     console.log('\n--- 1. Testing Empty Wallet ---');
@@ -37,7 +39,7 @@ async function testBandMode() {
     if (emptyCardsCount !== 0) {
       throw new Error(`Expected 0 cards for empty wallet, got ${emptyCardsCount}`);
     }
-    if (!emptyMsg.includes('no Squeeks')) {
+    if (!emptyMsg.toLowerCase().includes('no squeeks')) {
       throw new Error('Expected friendly empty wallet message!');
     }
 

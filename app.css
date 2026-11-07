@@ -522,6 +522,141 @@ body.app-body {
   margin-top: 0.6rem;
 }
 
+/* Band NFT Cards Responsive Grid */
+.band-cards-grid,
+#band-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 0.75rem;
+  margin-top: 1rem;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+@media (max-width: 600px) {
+  .band-cards-grid,
+  #band-cards-grid {
+    grid-template-columns: repeat(auto-fill, minmax(105px, 1fr));
+    gap: 0.5rem;
+  }
+}
+
+.squeek-card {
+  background-color: var(--color-ink);
+  border: 1px solid var(--color-hairline);
+  padding: 0.75rem 0.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.4rem;
+  cursor: pointer;
+  transition: border-color var(--duration-fast) var(--ease-snappy);
+  max-width: 100%;
+  box-sizing: border-box;
+  outline: none;
+  user-select: none;
+}
+
+.squeek-card:hover,
+.squeek-card:focus-visible {
+  border-color: var(--color-bone-muted);
+}
+
+.squeek-card.sounding {
+  border-color: var(--color-amber);
+}
+
+.squeek-card.spotlight {
+  border-color: var(--color-blue);
+}
+
+.squeek-avatar {
+  width: 72px;
+  height: 72px;
+  max-width: 100%;
+  background-color: #121217;
+  border: 1px solid var(--color-hairline);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.squeek-avatar img,
+.squeek-avatar svg {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.squeek-card-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  width: 100%;
+}
+
+.squeek-id {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-bone);
+  display: flex;
+  gap: 0.35rem;
+  justify-content: center;
+  align-items: center;
+}
+
+.squeek-voice {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: var(--color-bone-muted);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.squeek-power {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  color: var(--color-amber);
+  white-space: nowrap;
+}
+
+.squeek-custody {
+  font-family: var(--font-mono);
+  font-size: 0.55rem;
+  color: var(--color-bone-subtle);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.squeek-card-skeleton {
+  background-color: var(--color-ink);
+  border: 1px solid var(--color-hairline);
+  padding: 0.75rem 0.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 150px;
+  box-sizing: border-box;
+}
+
+.skeleton-box {
+  background-color: #18181f;
+  border: 1px solid var(--color-hairline);
+}
+
+.skeleton-line {
+  background-color: #18181f;
+  height: 8px;
+}
+
 /* 5. OBS / Stream Overlay Mode (?overlay=1) */
 body.overlay-mode {
   background: transparent !important;

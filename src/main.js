@@ -478,6 +478,7 @@ export async function loadBandTokens(tokens) {
 
     if (msgEl) {
       msgEl.textContent = `Band active: ${voices.length} Squeek instrument(s) seated on the dial.`;
+      msgEl.style.color = 'var(--color-amber)';
     }
   } else {
     audioEngine.setBandVoices([]);
@@ -490,6 +491,7 @@ export async function loadBandTokens(tokens) {
     }
     if (msgEl) {
       msgEl.textContent = 'No Squeeks at this address.';
+      msgEl.style.color = 'var(--color-bone-muted)';
     }
   }
 }
@@ -521,6 +523,7 @@ function setupBandControls() {
       if (!/^0x[0-9a-fA-F]{40}$/.test(address)) {
         if (msgEl) {
           msgEl.textContent = 'Please enter a valid Ethereum address (0x + 40 hex).';
+          msgEl.style.color = 'var(--color-amber)';
         }
         return;
       }
@@ -530,6 +533,10 @@ function setupBandControls() {
 
       loadBtn.disabled = true;
       loadBtn.textContent = 'Loading...';
+      if (msgEl) {
+        msgEl.style.color = 'var(--color-bone-muted)';
+        msgEl.textContent = `Fetching Squeeks for ${address.slice(0, 8)}...`;
+      }
 
       // Render honest card skeletons
       const container = document.getElementById('band-cards-grid');
@@ -539,10 +546,6 @@ function setupBandControls() {
         for (let i = 0; i < 4; i++) {
           container.appendChild(createCardSkeleton(i));
         }
-      }
-
-      if (msgEl) {
-        msgEl.textContent = `Fetching Squeeks for ${address.slice(0, 8)}...`;
       }
 
       try {
@@ -565,7 +568,8 @@ function setupBandControls() {
         await loadBandTokens(tokens);
       } catch (err) {
         if (currentGen === bandGenerationId && msgEl) {
-          msgEl.textContent = 'Could not reach the Squeekchain API. Retrying.';
+          msgEl.textContent = 'Could not reach Squeekchain API. Check address or try again.';
+          msgEl.style.color = 'var(--color-amber)';
         }
       } finally {
         if (currentGen === bandGenerationId) {
@@ -936,21 +940,31 @@ function setupReplayControls() {
   }
 }
 
+let gestureAttached = false;
+function setupOneShotGestureTune() {
+  if (gestureAttached) return;
+  gestureAttached = true;
+  const onFirstInteraction = async () => {
+    window.removeEventListener('pointerdown', onFirstInteraction);
+    window.removeEventListener('keydown', onFirstInteraction);
+    window.removeEventListener('touchstart', onFirstInteraction);
+    gestureAttached = false;
+    await tuneIn(true);
+  };
+  window.addEventListener('pointerdown', onFirstInteraction, { once: true, passive: true });
+  window.addEventListener('keydown', onFirstInteraction, { once: true, passive: true });
+  window.addEventListener('touchstart', onFirstInteraction, { once: true, passive: true });
+}
+
 /**
- * Toggle audio playback on/off with ignition animation.
+ * Start audio playback and transition to Tuned In state.
+ * If browser autoplay policy suspends it, attaches a one-shot gesture handler.
  */
-export async function toggleAudio() {
-  if (state.isTunedIn) {
-    audioEngine.stop();
-    state.isTunedIn = false;
-    if (elements.tuneBtn) {
-      elements.tuneBtn.classList.remove('active-tune', 'playing');
-      elements.tuneBtn.setAttribute('aria-pressed', 'false');
-    }
-    if (elements.tuneText) elements.tuneText.textContent = 'Tune in';
-  } else {
-    try {
-      await audioEngine.start();
+export async function tuneIn(fromGesture = false) {
+  if (state.isTunedIn) return;
+  try {
+    await audioEngine.start();
+    if (audioEngine.ctx && audioEngine.ctx.state === 'running') {
       if (centralDial && audioEngine.analyser) {
         centralDial.setAnalyser(audioEngine.analyser);
       }
@@ -964,9 +978,30 @@ export async function toggleAudio() {
         elements.tuneBtn.setAttribute('aria-pressed', 'true');
       }
       if (elements.tuneText) elements.tuneText.textContent = 'Mute';
-    } catch (err) {
-      console.error('Audio start failed:', err);
+    } else if (!fromGesture) {
+      setupOneShotGestureTune();
     }
+  } catch (err) {
+    if (!fromGesture) {
+      setupOneShotGestureTune();
+    }
+  }
+}
+
+/**
+ * Toggle audio playback on/off with ignition animation.
+ */
+export async function toggleAudio() {
+  if (state.isTunedIn) {
+    audioEngine.stop();
+    state.isTunedIn = false;
+    if (elements.tuneBtn) {
+      elements.tuneBtn.classList.remove('active-tune', 'playing');
+      elements.tuneBtn.setAttribute('aria-pressed', 'false');
+    }
+    if (elements.tuneText) elements.tuneText.textContent = 'Tune in';
+  } else {
+    await tuneIn(true);
   }
 }
 
@@ -1050,6 +1085,9 @@ export function init() {
     elements.tuneBtn.addEventListener('click', toggleAudio);
   }
 
+  // Tune in on user visit
+  tuneIn();
+
   if (elements.volumeSlider) {
     elements.volumeSlider.addEventListener('input', (e) => {
       const vol = parseFloat(e.target.value);
@@ -1128,13 +1166,26 @@ export function init() {
     if (diagBtn) diagBtn.click();
   }
 
-  // If wallet parameter in URL, auto-load
+  // If wallet parameter in URL, auto-load and reveal band drawer
   const initialWallet = urlParams.get('wallet');
   if (initialWallet && /^0x[0-9a-fA-F]{40}$/.test(initialWallet)) {
     const input = document.getElementById('wallet-input');
-    if (input) {
-      input.value = initialWallet;
-      fetchAllAccountTokens(initialWallet).then(loadBandTokens).catch(() => {});
+    const bandSection = document.getElementById('band-section');
+    const tabBand = document.getElementById('tab-band');
+    if (input) input.value = initialWallet;
+    if (bandSection) bandSection.classList.add('open');
+    if (tabBand) {
+      tabBand.setAttribute('aria-expanded', 'true');
+      tabBand.style.borderColor = 'var(--color-amber)';
+    }
+    fetchAllAccountTokens(initialWallet).then(loadBandTokens).catch(() => {});
+  } else if (state.activeMode === 'band') {
+    const bandSection = document.getElementById('band-section');
+    const tabBand = document.getElementById('tab-band');
+    if (bandSection) bandSection.classList.add('open');
+    if (tabBand) {
+      tabBand.setAttribute('aria-expanded', 'true');
+      tabBand.style.borderColor = 'var(--color-amber)';
     }
   }
 

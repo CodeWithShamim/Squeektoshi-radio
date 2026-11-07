@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Squeektoshi Radio - End-to-End Test Suite', () => {
-  test('loads without console errors and starts AudioContext on Tune In', async ({ page }) => {
+  test('loads without console errors and starts AudioContext on visit (with mute toggle)', async ({ page }) => {
     const consoleErrors = [];
     page.on('console', (msg) => {
       if (msg.type() === 'error') consoleErrors.push(msg.text());
@@ -14,11 +14,8 @@ test.describe('Squeektoshi Radio - End-to-End Test Suite', () => {
     const headerTitle = page.locator('.brand-name');
     await expect(headerTitle).toContainText('Squeektoshi Radio');
 
-    // Autoplay compliance: AudioContext should start only on user click
+    // Audio tunes in on user visit
     const tuneBtn = page.locator('#tune-btn');
-    await expect(tuneBtn).toHaveText(/Tune [iI]n/);
-
-    await tuneBtn.click();
     await expect(tuneBtn).toHaveText(/(● On Air|Mute)/);
 
     // AudioContext state check
@@ -27,6 +24,14 @@ test.describe('Squeektoshi Radio - End-to-End Test Suite', () => {
       return audioEngine.ctx ? audioEngine.ctx.state : null;
     });
     expect(ctxState).toBe('running');
+
+    // Clicking tuneBtn toggles to Tune in (pause/mute)
+    await tuneBtn.click();
+    await expect(tuneBtn).toHaveText(/Tune [iI]n/);
+
+    // Clicking again resumes
+    await tuneBtn.click();
+    await expect(tuneBtn).toHaveText(/(● On Air|Mute)/);
 
     expect(consoleErrors).toHaveLength(0);
   });

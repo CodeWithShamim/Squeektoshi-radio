@@ -95,19 +95,30 @@ export function createSqueekCard(token, onSpotlight = null) {
   img.style.opacity = '0';
   img.style.transition = 'opacity 0.3s ease';
 
-  const imgSrc = token.metadata?.imageDataUri || token.metadata?.cardImageUrl || generateDotGridAvatarDataUri(token.tokenId);
+  const imgSrc =
+    token.metadata?.imageUrl ||
+    token.metadata?.imageDataUri ||
+    token.metadata?.cardImageUrl ||
+    generateDotGridAvatarDataUri(token.tokenId);
+
+  img.onload = () => {
+    img.style.opacity = '1';
+  };
+  img.onerror = () => {
+    img.src = generateDotGridAvatarDataUri(token.tokenId);
+    img.style.opacity = '1';
+  };
+
   img.src = imgSrc;
 
-  // Safe image decoding before reveal
-  img.decode()
-    .then(() => {
+  // Safe image decoding before reveal if supported
+  if (typeof img.decode === 'function') {
+    img.decode().then(() => {
       img.style.opacity = '1';
-    })
-    .catch(() => {
-      // Fallback on decode failure
-      img.src = generateDotGridAvatarDataUri(token.tokenId);
-      img.style.opacity = '1';
+    }).catch(() => {
+      // Handled by onerror or fallback
     });
+  }
 
   avatarContainer.appendChild(img);
   card.appendChild(avatarContainer);
