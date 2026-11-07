@@ -16,10 +16,10 @@ test.describe('Squeektoshi Radio - End-to-End Test Suite', () => {
 
     // Autoplay compliance: AudioContext should start only on user click
     const tuneBtn = page.locator('#tune-btn');
-    await expect(tuneBtn).toHaveText(/Tune In/);
+    await expect(tuneBtn).toHaveText(/Tune [iI]n/);
 
     await tuneBtn.click();
-    await expect(tuneBtn).toHaveText(/● On Air/);
+    await expect(tuneBtn).toHaveText(/(● On Air|Mute)/);
 
     // AudioContext state check
     const ctxState = await page.evaluate(async () => {
@@ -62,6 +62,8 @@ test.describe('Squeektoshi Radio - End-to-End Test Suite', () => {
     // Should be in zoomies mood (75 RPM)
     const moodBadge = page.locator('#badge-mood');
     await expect(moodBadge).toHaveText('ZOOMIES');
+    const dialSvg = page.locator('#dial-svg');
+    await expect(dialSvg).toHaveClass(/dial-mood-zoomies/);
 
     // Flip mocked status to IDLE (0 RPM)
     currentMockStatus = {
@@ -84,6 +86,7 @@ test.describe('Squeektoshi Radio - End-to-End Test Suite', () => {
 
     // Should now flip to SLEEP mood
     await expect(moodBadge).toHaveText('SLEEP');
+    await expect(dialSvg).toHaveClass(/dial-mood-sleep/);
   });
 
   test('unavailable status shows banner and preserves state as UNKNOWN (not sleep or zero)', async ({ page }) => {
@@ -135,9 +138,12 @@ test.describe('Squeektoshi Radio - End-to-End Test Suite', () => {
     // Status banner MUST be visible
     const banner = page.locator('#status-banner');
     await expect(banner).toBeVisible();
+    await expect(page.locator('#signal-text')).toHaveText('unknown');
 
     // Mood MUST transition to UNKNOWN, NOT SLEEP!
     await expect(moodBadge).toHaveText('UNKNOWN');
+    const dialSvg = page.locator('#dial-svg');
+    await expect(dialSvg).toHaveClass(/dial-mood-unknown/);
 
     // Block height MUST be preserved from last known good state
     await expect(blockVal).toHaveText('#1250');
@@ -148,8 +154,21 @@ test.describe('Squeektoshi Radio - End-to-End Test Suite', () => {
 
     await expect(page.locator('body')).toHaveClass(/overlay-mode/);
     await expect(page.locator('#overlay-container')).toBeVisible();
-    await expect(page.locator('.radio-panel')).toBeHidden();
-    await expect(page.locator('.station-header')).toBeHidden();
+    await expect(page.locator('.app-bottom-bar')).toBeHidden();
+    await expect(page.locator('#tune-btn')).toBeHidden();
+  });
+
+  test('reduced motion disables entry sequence and sweep line', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.goto('/app.html');
+
+    // Entry sweep line should be removed / hidden immediately
+    const sweepLine = page.locator('#entry-sweep-line');
+    await expect(sweepLine).toHaveCount(0);
+
+    // Readout wrappers should be immediately visible
+    const moodBadge = page.locator('#badge-mood');
+    await expect(moodBadge).toBeVisible();
   });
 });
 

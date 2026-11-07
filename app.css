@@ -1,0 +1,653 @@
+/* ==========================================================================
+   Squeektoshi Radio — Station Console Stylesheet (app.html)
+   Art Direction: Precision Instrument Console
+   Palette: Ink #0b0b0e, Bone #e9e6dc, Signal Amber #ffb23e, Data Blue #5b8cff
+   ========================================================================== */
+
+@import url('tokens.css');
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  background-color: var(--color-ink);
+  color: var(--color-bone);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body.app-body {
+  background-color: var(--color-ink);
+  color: var(--color-bone);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* Subtle Hairline Grid Overlay */
+.app-grid-lines {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 5;
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  padding: 0 var(--page-margin);
+  border-left: 1px solid var(--color-hairline);
+  border-right: 1px solid var(--color-hairline);
+}
+
+.app-grid-col {
+  height: 100%;
+  border-right: 1px solid var(--color-hairline);
+}
+
+.app-grid-col:last-child {
+  border-right: none;
+}
+
+/* 0. Entry Sweep Line */
+.entry-sweep-line {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 10000;
+  pointer-events: none;
+  background-color: var(--color-ink);
+  transform: translateX(0%);
+  border-right: 3px solid var(--color-amber);
+}
+
+.entry-sweep-line.exiting {
+  transform: translateX(100%);
+  transition: transform 0.6s cubic-bezier(0.85, 0, 0.15, 1);
+}
+
+.seat-tooltip {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  color: var(--color-bone);
+  background: var(--color-ink);
+  border: 1px solid var(--color-hairline);
+  padding: 0.3rem 0.6rem;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--duration-short) var(--ease-motion);
+  z-index: 30;
+}
+
+.seat-tooltip.visible {
+  opacity: 1;
+}
+
+.visually-hidden-track {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
+/* 1. Top Instrument Bar */
+.app-header {
+  height: var(--header-height);
+  border-bottom: 1px solid var(--color-hairline);
+  padding: 0 var(--page-margin);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: relative;
+  z-index: 20;
+}
+
+.header-left, .header-right {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.app-back-link {
+  color: var(--color-bone-muted);
+  text-decoration: none;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.6rem;
+  border: 1px solid var(--color-hairline);
+  transition: color var(--duration-short) var(--ease-motion), border-color var(--duration-short) var(--ease-motion);
+}
+
+.app-back-link:hover, .app-back-link:focus-visible {
+  color: var(--color-bone);
+  border-color: var(--color-bone-muted);
+  outline: none;
+}
+
+.app-station-title {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-bone);
+}
+
+.header-signal {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--color-bone-muted);
+}
+
+.signal-indicator-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--color-blue);
+}
+
+.signal-indicator-dot.live {
+  background-color: var(--color-amber);
+}
+
+.signal-indicator-dot.unknown, .signal-indicator-dot.stale {
+  background-color: var(--color-bone-subtle);
+}
+
+/* 2. Alert Banner (Signal Unknown) */
+.station-alert-banner {
+  display: none;
+  background-color: var(--color-ink);
+  border-bottom: 1px solid var(--color-amber);
+  color: var(--color-amber);
+  padding: 0.5rem var(--page-margin);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  justify-content: space-between;
+  align-items: center;
+  z-index: 25;
+}
+
+.station-alert-banner.visible {
+  display: flex;
+}
+
+.alert-dismiss-btn {
+  background: transparent;
+  border: 1px solid var(--color-amber);
+  color: var(--color-amber);
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  padding: 0.15rem 0.5rem;
+  cursor: pointer;
+}
+
+/* 3. Main Console Layout: 12-Column Instrument Stage */
+.console-container {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  max-width: 1600px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 1.5rem var(--page-margin);
+  position: relative;
+  z-index: 10;
+  align-items: center;
+  min-height: calc(100vh - var(--header-height) - var(--bottom-bar-height));
+}
+
+/* Left Rail (Cols 1 - 3): Typographic Readout Stack */
+.readouts-rail-left {
+  grid-column: 1 / 4;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  padding-right: 1.5rem;
+}
+
+.readout-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.readout-label {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--color-bone-subtle);
+}
+
+.readout-value {
+  font-family: var(--font-mono);
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: var(--color-bone);
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.readout-value.large-num {
+  font-family: var(--font-display);
+  font-size: 2.8rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.readout-value.mood-display {
+  text-transform: uppercase;
+}
+.readout-value.mood-display.sleep { color: var(--color-blue); }
+.readout-value.mood-display.jog { color: var(--color-bone); }
+.readout-value.mood-display.zoomies { color: var(--color-amber); }
+.readout-value.mood-display.unknown { color: var(--color-bone-muted); text-decoration: underline dotted; }
+
+/* Center Hero Dial (Cols 4 - 9) */
+.dial-stage-center {
+  grid-column: 4 / 10;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  max-width: 580px;
+  margin: 0 auto;
+}
+
+.dial-wrapper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.dial-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.dial-waveform-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+/* Squeek Band Seats around Dial */
+.band-seat-marker {
+  cursor: pointer;
+  transition: transform var(--duration-short) var(--ease-motion), opacity var(--duration-short) var(--ease-motion);
+}
+
+.band-seat-marker:hover, .band-seat-marker:focus-visible {
+  outline: none;
+  stroke: var(--color-amber);
+}
+
+/* Right Rail (Cols 10 - 12): Block, SQK, Settlement Log */
+.readouts-rail-right {
+  grid-column: 10 / 13;
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+  padding-left: 1.5rem;
+}
+
+.settlement-log-box {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  border-top: 1px solid var(--color-hairline);
+  padding-top: 1rem;
+}
+
+.settlement-log-title {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--color-bone-subtle);
+}
+
+.settlement-log-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--color-bone-muted);
+  list-style: none;
+  max-height: 160px;
+  overflow: hidden;
+}
+
+.settlement-log-row {
+  display: flex;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(233, 230, 220, 0.05);
+  padding-bottom: 0.2rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.settlement-log-row.new-entry {
+  animation: log-row-reveal 0.6s var(--ease-motion) both;
+}
+
+@keyframes log-row-reveal {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* 4. Bottom Control Bar */
+.app-bottom-bar {
+  border-top: 1px solid var(--color-hairline);
+  padding: 0 var(--page-margin);
+  height: var(--bottom-bar-height);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2rem;
+  position: relative;
+  z-index: 20;
+  background-color: var(--color-ink);
+}
+
+.controls-left, .controls-right {
+  display: flex;
+  align-items: center;
+  gap: 1.75rem;
+}
+
+/* Primary Tune in / Mute Button */
+.btn-console-primary {
+  background-color: transparent;
+  color: var(--color-amber);
+  border: 1px solid var(--color-amber);
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 0.65rem 1.6rem;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: color var(--duration-short) var(--ease-motion), background-color var(--duration-short) var(--ease-motion);
+}
+
+.btn-console-primary:hover, .btn-console-primary:focus-visible {
+  background-color: var(--color-amber);
+  color: var(--color-ink);
+  outline: none;
+}
+
+.btn-console-primary.active-tune {
+  background-color: var(--color-bone);
+  color: var(--color-ink);
+  border-color: var(--color-bone);
+}
+
+/* Secondary Action Buttons */
+.btn-console-secondary {
+  background-color: transparent;
+  color: var(--color-bone-muted);
+  border: 1px solid var(--color-hairline);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 0.55rem 1.2rem;
+  cursor: pointer;
+  transition: color var(--duration-short) var(--ease-motion), border-color var(--duration-short) var(--ease-motion);
+}
+
+.btn-console-secondary:hover, .btn-console-secondary:focus-visible {
+  color: var(--color-bone);
+  border-color: var(--color-bone-muted);
+  outline: none;
+}
+
+/* Volume Slider */
+.volume-control-group {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.volume-label {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-bone-subtle);
+}
+
+.hairline-slider {
+  width: 90px;
+  accent-color: var(--color-amber);
+  cursor: pointer;
+}
+
+/* Keyboard Shortcut Hints */
+.keyboard-hints {
+  display: flex;
+  gap: 1.25rem;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  color: var(--color-bone-subtle);
+  text-transform: uppercase;
+}
+
+.kbd-tag {
+  color: var(--color-bone-muted);
+  border: 1px solid var(--color-hairline);
+  padding: 0.1rem 0.35rem;
+  margin-right: 0.25rem;
+}
+
+/* Drawer Panels (Band Wallet & 24h Replay expanded drawers) */
+.drawer-panel {
+  display: none;
+  border-top: 1px solid var(--color-hairline);
+  padding: 1.25rem var(--page-margin);
+  background-color: var(--color-ink);
+  z-index: 15;
+}
+
+.drawer-panel.open {
+  display: block;
+}
+
+.wallet-form-bar {
+  display: flex;
+  gap: 0.75rem;
+  max-width: 650px;
+}
+
+.console-input {
+  flex: 1;
+  background-color: transparent;
+  border: 1px solid var(--color-hairline);
+  color: var(--color-bone);
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  padding: 0.5rem 0.8rem;
+}
+
+.console-input:focus {
+  border-color: var(--color-bone-muted);
+  outline: none;
+}
+
+.drawer-status-msg {
+  font-size: 0.78rem;
+  color: var(--color-bone-muted);
+  margin-top: 0.6rem;
+}
+
+/* 5. OBS / Stream Overlay Mode (?overlay=1) */
+body.overlay-mode {
+  background: transparent !important;
+  background-image: none !important;
+  overflow: hidden;
+}
+
+body.chroma-mode {
+  background: #00ff00 !important;
+}
+
+body.overlay-mode .app-grid-lines,
+body.overlay-mode .app-header,
+body.overlay-mode .readouts-rail-left,
+body.overlay-mode .readouts-rail-right,
+body.overlay-mode .app-bottom-bar,
+body.overlay-mode .drawer-panel {
+  display: none !important;
+}
+
+body.overlay-mode .console-container {
+  padding: 0.5rem;
+  min-height: auto;
+  display: flex;
+  justify-content: flex-start;
+}
+
+body.overlay-mode .dial-stage-center {
+  max-width: 140px;
+  margin: 0;
+}
+
+.overlay-now-playing {
+  display: none;
+}
+
+body.overlay-mode .overlay-now-playing {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.3rem;
+  margin-left: 1rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--color-bone);
+  background: rgba(11, 11, 14, 0.88);
+  padding: 0.6rem 1rem;
+  border: 1px solid var(--color-hairline);
+}
+
+/* 6. Reduced Motion Preference */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  .entry-sweep-line {
+    display: none !important;
+  }
+}
+
+/* 7. Mobile Responsive (360px - 768px) */
+@media (max-width: 768px) {
+  :root {
+    --page-margin: 1.25rem;
+    --bottom-bar-height: auto;
+  }
+  
+  .console-container {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    padding: 1.25rem var(--page-margin);
+    min-height: auto;
+  }
+  
+  .dial-stage-center {
+    order: 1;
+    width: min(85vw, 320px);
+  }
+  
+  .readouts-rail-left {
+    order: 2;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.25rem;
+    width: 100%;
+    padding-right: 0;
+  }
+  
+  .readouts-rail-right {
+    order: 3;
+    width: 100%;
+    padding-left: 0;
+  }
+  
+  .app-bottom-bar {
+    flex-direction: column;
+    padding: 1rem var(--page-margin);
+    height: auto;
+    gap: 1rem;
+  }
+  
+  .controls-left, .controls-right {
+    width: 100%;
+    justify-content: space-between;
+  }
+  
+  .keyboard-hints {
+    display: none;
+  }
+  
+  .btn-console-primary, .btn-console-secondary {
+    min-height: 44px; /* Accessible mobile tap target */
+  }
+}
+
+.app-disclaimer-notice {
+  position: absolute;
+  bottom: 2px;
+  left: var(--page-margin);
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  letter-spacing: 0.08em;
+  color: var(--color-bone-subtle);
+  pointer-events: none;
+  z-index: 30;
+}
+

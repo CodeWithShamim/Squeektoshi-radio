@@ -1,5 +1,6 @@
 /**
- * Squeektoshi Radio - Main Application Entry
+ * Squeektoshi Radio - Main Application Entry (src/main.js)
+ * Coordinates Audio Engine, Telemetry Polling, Instrument Dial, Motion System & Readouts.
  */
 
 import {
@@ -16,12 +17,20 @@ import {
 } from './music/mapping.js';
 import { audioEngine } from './music/engine.js';
 import { VisualizerManager } from './ui/visualizer.js';
+import { CentralDial } from './ui/dial.js';
+import { MotionSystem } from './ui/motion.js';
+import { ReadoutsManager } from './ui/readouts.js';
+import { BandRingManager } from './ui/band-ring.js';
 import { ReplayPlayer, composeDayPlan } from './music/replay.js';
 import { buildBandVoices } from './music/band.js';
 import { createSqueekCard } from './ui/cards.js';
 import { fetchAllAccountTokens, fetchSqueekMetadata, getDemoBandTokens } from './api.js';
 
 let visualizer = null;
+let centralDial = null;
+let motionSystem = null;
+let readoutsManager = null;
+let bandRing = null;
 let replayPlayer = null;
 
 // Application State
@@ -39,6 +48,7 @@ export const state = {
   economy: null,
   lastGoodStatus: null,
   lastSettlementCount: null,
+  lastBlockHeight: null,
 
   // Timing
   demoStartTime: Date.now(),
@@ -62,6 +72,7 @@ const elements = {
   badgeMood: document.getElementById('badge-mood'),
   valRpm: document.getElementById('val-rpm'),
   valBpm: document.getElementById('val-bpm'),
+  valKeyRoot: document.getElementById('val-key-root'),
   valKey: document.getElementById('val-key'),
   valBlockHeight: document.getElementById('val-block-height'),
   valSqkMinted: document.getElementById('val-sqk-minted'),
@@ -74,11 +85,6 @@ const elements = {
   overlayBpm: document.getElementById('overlay-bpm'),
   overlayBlock: document.getElementById('overlay-block'),
   overlayProgress: document.getElementById('overlay-progress'),
-
-  heroRpm: document.getElementById('hero-rpm'),
-  heroMood: document.getElementById('hero-mood'),
-  heroBlock: document.getElementById('hero-block'),
-  heroSqk: document.getElementById('hero-sqk'),
 };
 
 /**
@@ -89,41 +95,49 @@ export function updateUI(statusData) {
 
   const mood = resolveMood(statusData);
   const bpm = calculateBpm(statusData.rpm);
-  const { rootName } = calculateKey(statusData.blockHeight);
+  const keyInfo = calculateKey(statusData.blockHeight);
 
   let scaleLabel = 'Minor Pentatonic';
   if (mood === 'jog') scaleLabel = 'Dorian';
   if (mood === 'zoomies') scaleLabel = 'Mixolydian';
-  const keyName = `${rootName} ${scaleLabel}`;
+  const keyName = `${keyInfo.rootName} ${scaleLabel}`;
 
   const progressPct = Math.min(100, Math.max(0, Math.round((statusData.blockProgressRatio || 0) * 100)));
 
-  // Telemetry widgets
-  if (elements.badgeMood) {
-    elements.badgeMood.className = `mood-badge ${mood}`;
-    elements.badgeMood.textContent = mood.toUpperCase();
+  // Detect block height completion
+  if (state.lastBlockHeight !== null && statusData.blockHeight > state.lastBlockHeight) {
+    if (motionSystem) motionSystem.runBlockComplete();
+  }
+  state.lastBlockHeight = statusData.blockHeight;
+
+  // 1. Update Readouts Coordinator
+  if (readoutsManager) {
+    readoutsManager.updateTelemetry(statusData, bpm, keyInfo, mood);
   }
 
+  // 2. Direct DOM bindings for backward test compatibility
+  if (elements.badgeMood) {
+    elements.badgeMood.className = `mood-badge readout-value mood-display ${mood}`;
+    elements.badgeMood.textContent = mood.toUpperCase();
+  }
   if (elements.valRpm) {
     elements.valRpm.textContent = `${(statusData.rpm || 0).toFixed(1)} RPM`;
   }
-
   if (elements.valBpm) {
     elements.valBpm.textContent = `${bpm} BPM`;
   }
-
+  if (elements.valKeyRoot) {
+    elements.valKeyRoot.textContent = keyInfo.rootName;
+  }
   if (elements.valKey) {
     elements.valKey.textContent = keyName;
   }
-
   if (elements.valBlockHeight) {
     elements.valBlockHeight.textContent = `#${statusData.blockHeight ?? 0}`;
   }
-
   if (elements.valProgressPct) {
     elements.valProgressPct.textContent = `${progressPct}%`;
   }
-
   if (elements.progressBarFill) {
     elements.progressBarFill.style.width = `${progressPct}%`;
   }
@@ -131,41 +145,41 @@ export function updateUI(statusData) {
     elements.progressTrack.setAttribute('aria-valuenow', String(progressPct));
   }
 
-  // Signal badge & banner
+  // Signal & banner backward compatibility
   if (elements.signalDot && elements.signalText) {
     if (!statusData.isAvailable || statusData.freshness === 'stale' || statusData.freshness === 'unavailable') {
-      elements.signalDot.className = 'freshness-dot stale';
-      elements.signalText.textContent = statusData.freshness === 'stale' ? 'Stale' : 'Signal Lost';
+      elements.signalDot.className = 'signal-indicator-dot freshness-dot stale';
+      elements.signalText.textContent = statusData.freshness === 'stale' ? 'stale' : 'unknown';
       if (elements.statusBanner) elements.statusBanner.classList.add('visible');
     } else if (state.isDemo) {
-      elements.signalDot.className = 'freshness-dot';
+      elements.signalDot.className = 'signal-indicator-dot freshness-dot live';
       elements.signalText.textContent = 'Simulated';
       if (elements.statusBanner) elements.statusBanner.classList.remove('visible');
     } else if (statusData.isAvailable && statusData.isOnline) {
-      elements.signalDot.className = 'freshness-dot';
-      elements.signalText.textContent = 'Live · 12-conf safe';
+      elements.signalDot.className = 'signal-indicator-dot freshness-dot live';
+      elements.signalText.textContent = 'live';
       if (elements.statusBanner) elements.statusBanner.classList.remove('visible');
     }
   }
 
-  // Stream Overlay sync
+  // 3. Update Stream Overlay
   if (elements.overlayMood) elements.overlayMood.textContent = mood.toUpperCase();
   if (elements.overlayBpm) elements.overlayBpm.textContent = `${bpm} BPM`;
   if (elements.overlayBlock) elements.overlayBlock.textContent = `#${statusData.blockHeight ?? 0}`;
   if (elements.overlayProgress) elements.overlayProgress.textContent = `${progressPct}%`;
 
-  // Hero Ticker sync
-  if (elements.heroRpm) elements.heroRpm.textContent = `${(statusData.rpm || 0).toFixed(1)} RPM`;
-  if (elements.heroMood) {
-    elements.heroMood.textContent = mood.toUpperCase();
-    elements.heroMood.className = `ticker-val ${mood === 'zoomies' ? 'gold' : mood === 'jog' ? 'blue' : ''}`;
+  // 4. Update Central Instrument Dial
+  if (centralDial) {
+    centralDial.setTelemetry({
+      ...statusData,
+      mood,
+    });
   }
-  if (elements.heroBlock) elements.heroBlock.textContent = `#${statusData.blockHeight ?? 0}`;
 
-  // Feed to audio engine
+  // 5. Feed to audio engine
   audioEngine.updateTelemetry(statusData);
 
-  // Feed to visualizer
+  // 6. Feed to legacy visualizer if present
   if (visualizer) {
     visualizer.setRpm(statusData.rpm);
   }
@@ -176,10 +190,12 @@ export function updateUI(statusData) {
  */
 export function updateEconomyUI(economyData) {
   if (!economyData) return;
-  if (economyData.totalMintedSQK !== undefined) {
+  if (readoutsManager) {
+    readoutsManager.updateEconomy(economyData);
+  }
+  if (economyData.totalMintedSQK !== undefined && elements.valSqkMinted) {
     const formatted = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(economyData.totalMintedSQK);
-    if (elements.valSqkMinted) elements.valSqkMinted.textContent = `${formatted} SQK`;
-    if (elements.heroSqk) elements.heroSqk.textContent = `${formatted} SQK`;
+    elements.valSqkMinted.textContent = `${formatted} SQK`;
   }
 }
 
@@ -257,12 +273,29 @@ async function pollSettlements() {
     const raw = await apiFetch('/v1/settlements?range=24h');
     const parsed = parseSettlements(raw);
     if (parsed.status === 'available') {
-      // Detect settlement count increase -> ring settlement chime!
+      // Detect settlement count increase -> chime and log row
       if (state.lastSettlementCount !== null && parsed.settlementCount > state.lastSettlementCount) {
         audioEngine.ringSettlementChime();
+        if (centralDial) centralDial.triggerChimePulse();
+
+        const latest = parsed.recentSettlements?.[0];
+        const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const roundNum = latest?.roundNumber || 'Settlement';
+        const workUnits = latest?.workAdded || 'PoW';
+        if (readoutsManager) {
+          readoutsManager.addSettlementEntry(timeStr, roundNum, workUnits);
+        }
       }
       state.lastSettlementCount = parsed.settlementCount;
       state.settlements = parsed;
+
+      // Populate initial settlement rows
+      if (parsed.recentSettlements?.length && readoutsManager?.settlementRows.length <= 1) {
+        parsed.recentSettlements.slice(0, 5).forEach((item) => {
+          const t = new Date(item.settledAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          readoutsManager.addSettlementEntry(t, item.roundNumber || '120', item.workAdded || '480k');
+        });
+      }
     }
   } catch (err) {
     console.warn('Settlements poll failed:', err.message);
@@ -270,7 +303,7 @@ async function pollSettlements() {
 }
 
 /**
- * Start recurring background polling, pausing when tab is hidden.
+ * Start recurring background polling.
  */
 function startPolling() {
   pollStatus();
@@ -309,26 +342,24 @@ function startPolling() {
  */
 export function renderTimeline(buckets) {
   const container = document.getElementById('timeline-buckets');
-  if (!container) return;
-
   const plan = composeDayPlan(buckets);
-  container.innerHTML = '';
 
-  plan.forEach((item, idx) => {
-    const bar = document.createElement('div');
-    bar.className = `bucket-bar ${item.mood}`;
-    bar.id = `bucket-bar-${idx}`;
-    bar.title = `Hour ${idx + 1}: ${item.workAdded} work, ${item.completedBlockCount} blocks (${item.mood})`;
-
-    bar.addEventListener('click', () => {
-      if (replayPlayer) {
-        replayPlayer.stop();
-        replayPlayer.play(idx);
-      }
+  if (container) {
+    container.innerHTML = '';
+    plan.forEach((item, idx) => {
+      const bar = document.createElement('div');
+      bar.className = `bucket-bar ${item.mood}`;
+      bar.id = `bucket-bar-${idx}`;
+      bar.title = `Hour ${idx + 1}: ${item.workAdded} work (${item.mood})`;
+      bar.addEventListener('click', () => {
+        if (replayPlayer) {
+          replayPlayer.stop();
+          replayPlayer.play(idx);
+        }
+      });
+      container.appendChild(bar);
     });
-
-    container.appendChild(bar);
-  });
+  }
 
   const startTimeEl = document.getElementById('replay-start-time');
   const endTimeEl = document.getElementById('replay-end-time');
@@ -342,54 +373,30 @@ export function renderTimeline(buckets) {
 
 /**
  * Loads a set of tokens into the band and updates the UI.
- * @param {Array<object>} tokens
  */
 export async function loadBandTokens(tokens) {
   const container = document.getElementById('band-cards-grid');
   const msgEl = document.getElementById('band-status-msg');
-  if (!container) return;
 
-  container.innerHTML = '';
+  if (tokens && tokens.length > 0) {
+    const voices = buildBandVoices(tokens);
+    audioEngine.setBandVoices(voices);
 
-  if (!tokens || tokens.length === 0) {
+    if (bandRing) {
+      bandRing.setTokens(tokens);
+    }
     if (msgEl) {
-      msgEl.style.display = 'block';
-      msgEl.innerHTML = '🐹 This wallet holds no Squeeks on Sepolia. Click <strong>Demo Band</strong> to hear a full ensemble!';
+      msgEl.textContent = `Band active: ${voices.length} Squeek instrument(s) seated on the dial.`;
     }
+  } else {
     audioEngine.setBandVoices([]);
-    return;
-  }
-
-  // 1. Instantly render cards with dot-grid avatars and activate audio voices
-  tokens.forEach((token) => {
-    container.appendChild(createSqueekCard(token));
-  });
-
-  const voices = buildBandVoices(tokens);
-  audioEngine.setBandVoices(voices);
-
-  if (msgEl) {
-    msgEl.style.display = 'block';
-    msgEl.textContent = `Band active: ${voices.length} Squeek instrument(s) currently performing in the station!`;
-  }
-
-  // 2. Progressively fetch and upgrade SVG images from metadata in the background
-  tokens.slice(0, 12).forEach(async (token) => {
-    if (token.metadata?.imageDataUri) return;
-    try {
-      const meta = await fetchSqueekMetadata(token.tokenId);
-      if (meta?.imageDataUri) {
-        token.metadata = meta;
-        const oldCard = document.getElementById(`squeek-card-${token.tokenId}`);
-        if (oldCard) {
-          const newCard = createSqueekCard(token);
-          oldCard.replaceWith(newCard);
-        }
-      }
-    } catch {
-      // Retain clean dot-grid avatar on metadata error
+    if (bandRing) {
+      bandRing.setTokens([]);
     }
-  });
+    if (msgEl) {
+      msgEl.textContent = 'No Squeeks at this address.';
+    }
+  }
 }
 
 /**
@@ -401,14 +408,24 @@ function setupBandControls() {
   const loadBtn = document.getElementById('wallet-load-btn');
   const demoBtn = document.getElementById('demo-band-btn');
   const msgEl = document.getElementById('band-status-msg');
+  const tabBand = document.getElementById('tab-band');
+  const bandSection = document.getElementById('band-section');
+
+  // Drawer Toggle
+  if (tabBand && bandSection) {
+    tabBand.addEventListener('click', () => {
+      const isOpen = bandSection.classList.toggle('open');
+      tabBand.setAttribute('aria-expanded', String(isOpen));
+      tabBand.style.borderColor = isOpen ? 'var(--color-amber)' : 'var(--color-hairline)';
+    });
+  }
 
   if (form && input && loadBtn) {
     const handleLoad = async () => {
       const address = input.value.trim();
       if (!/^0x[0-9a-fA-F]{40}$/.test(address)) {
         if (msgEl) {
-          msgEl.style.display = 'block';
-          msgEl.textContent = '⚠️ Please enter a valid Ethereum address (0x followed by 40 hex digits).';
+          msgEl.textContent = 'Please enter a valid Ethereum address (0x + 40 hex).';
         }
         return;
       }
@@ -416,7 +433,6 @@ function setupBandControls() {
       loadBtn.disabled = true;
       loadBtn.textContent = 'Loading...';
       if (msgEl) {
-        msgEl.style.display = 'block';
         msgEl.textContent = `Fetching Squeeks for ${address.slice(0, 8)}...`;
       }
 
@@ -425,12 +441,11 @@ function setupBandControls() {
         await loadBandTokens(tokens);
       } catch (err) {
         if (msgEl) {
-          msgEl.style.display = 'block';
-          msgEl.textContent = `⚠️ Could not load wallet: ${err.message}`;
+          msgEl.textContent = 'Could not reach the Squeekchain API. Retrying.';
         }
       } finally {
         loadBtn.disabled = false;
-        loadBtn.textContent = 'Join Band';
+        loadBtn.textContent = 'Load Squeeks';
       }
     };
 
@@ -443,7 +458,7 @@ function setupBandControls() {
 
   if (demoBtn) {
     demoBtn.addEventListener('click', async () => {
-      if (input) input.value = 'Demo Band (5 Squeeks)';
+      if (input) input.value = '0xDemoBand...';
       const demoTokens = getDemoBandTokens();
       await loadBandTokens(demoTokens);
     });
@@ -454,25 +469,19 @@ function setupBandControls() {
  * Setup Replay Controls and Mode Tabs.
  */
 function setupReplayControls() {
-  const tabLive = document.getElementById('tab-live');
   const tabReplay = document.getElementById('tab-replay');
   const replayPanel = document.getElementById('replay-panel');
   const replayBtn = document.getElementById('replay-play-btn');
 
-  if (tabLive && tabReplay && replayPanel) {
-    tabLive.addEventListener('click', () => {
-      tabLive.classList.add('active');
-      tabReplay.classList.remove('active');
-      replayPanel.classList.remove('active');
-      if (replayPlayer) replayPlayer.stop();
-      if (replayBtn) replayBtn.textContent = '▶ Play 24h Symphony';
-    });
-
+  // Replay Drawer Toggle
+  if (tabReplay && replayPanel) {
     tabReplay.addEventListener('click', () => {
-      tabReplay.classList.add('active');
-      tabLive.classList.remove('active');
-      replayPanel.classList.add('active');
-      renderTimeline(state.settlements?.buckets || []);
+      const isOpen = replayPanel.classList.toggle('open');
+      tabReplay.setAttribute('aria-expanded', String(isOpen));
+      tabReplay.style.borderColor = isOpen ? 'var(--color-amber)' : 'var(--color-hairline)';
+      if (isOpen) {
+        renderTimeline(state.settlements?.buckets || []);
+      }
     });
   }
 
@@ -480,7 +489,7 @@ function setupReplayControls() {
     replayBtn.addEventListener('click', async () => {
       if (replayPlayer?.isPlaying) {
         replayPlayer.stop();
-        replayBtn.textContent = '▶ Play 24h Symphony';
+        replayBtn.textContent = '▶ Play Symphony';
         return;
       }
 
@@ -489,20 +498,16 @@ function setupReplayControls() {
         replayPlayer = new ReplayPlayer(
           audioEngine,
           (hourIndex, item) => {
-            // Highlight active bar
-            document.querySelectorAll('.bucket-bar').forEach((b) => b.classList.remove('active-hour'));
-            const activeBar = document.getElementById(`bucket-bar-${hourIndex}`);
-            if (activeBar) activeBar.classList.add('active-hour');
-
+            if (centralDial) centralDial.setActiveHour(hourIndex);
             const statusEl = document.getElementById('replay-current-hour');
             if (statusEl) {
               const timeStr = new Date(item.startAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-              statusEl.textContent = `Hour ${hourIndex + 1}/24 (${timeStr}) · ${item.workAdded} work · ${item.completedBlockCount} blocks`;
+              statusEl.textContent = `Hour ${hourIndex + 1}/24 (${timeStr}) · ${item.workAdded} work`;
             }
           },
           () => {
-            if (replayBtn) replayBtn.textContent = '▶ Play 24h Symphony';
-            document.querySelectorAll('.bucket-bar').forEach((b) => b.classList.remove('active-hour'));
+            if (replayBtn) replayBtn.textContent = '▶ Play Symphony';
+            if (centralDial) centralDial.setActiveHour(-1);
           }
         );
       }
@@ -515,26 +520,33 @@ function setupReplayControls() {
 }
 
 /**
- * Toggle audio playback on/off.
+ * Toggle audio playback on/off with ignition animation.
  */
 export async function toggleAudio() {
   if (state.isTunedIn) {
     audioEngine.stop();
     state.isTunedIn = false;
     if (elements.tuneBtn) {
-      elements.tuneBtn.classList.remove('playing');
+      elements.tuneBtn.classList.remove('active-tune', 'playing');
       elements.tuneBtn.setAttribute('aria-pressed', 'false');
     }
-    if (elements.tuneText) elements.tuneText.textContent = 'Tune In';
+    if (elements.tuneText) elements.tuneText.textContent = 'Tune in';
   } else {
     try {
       await audioEngine.start();
+      if (centralDial && audioEngine.analyser) {
+        centralDial.setAnalyser(audioEngine.analyser);
+      }
+      if (motionSystem) {
+        motionSystem.runIgnition();
+      }
+
       state.isTunedIn = true;
       if (elements.tuneBtn) {
-        elements.tuneBtn.classList.add('playing');
+        elements.tuneBtn.classList.add('active-tune', 'playing');
         elements.tuneBtn.setAttribute('aria-pressed', 'true');
       }
-      if (elements.tuneText) elements.tuneText.textContent = '● On Air';
+      if (elements.tuneText) elements.tuneText.textContent = 'Mute';
     } catch (err) {
       console.error('Audio start failed:', err);
     }
@@ -550,9 +562,29 @@ export function init() {
   state.isOverlay = urlParams.get('overlay') === '1';
   state.isChroma = urlParams.get('chroma') === '1';
 
+  // Instantiate Presentation Layer
+  motionSystem = new MotionSystem();
+  readoutsManager = new ReadoutsManager(motionSystem);
+  bandRing = new BandRingManager();
+
+  // Instantiate Central Dial
+  const dialSvg = document.getElementById('dial-svg');
+  if (dialSvg) {
+    centralDial = new CentralDial({
+      onHourSelect: (h) => {
+        if (replayPlayer) {
+          replayPlayer.stop();
+          replayPlayer.play(h);
+        }
+      },
+    });
+  }
+
+  // Run Entry Sequence Animation
+  motionSystem.runEntrySequence();
+
   if (state.isOverlay) {
     document.body.classList.add('overlay-mode');
-    // In OBS browser source, try auto-starting audio
     audioEngine.start().catch(() => {
       window.addEventListener('click', () => audioEngine.start(), { once: true });
     });
@@ -581,8 +613,8 @@ export function init() {
     elements.muteBtn.addEventListener('click', () => {
       state.isMuted = !state.isMuted;
       audioEngine.setMute(state.isMuted);
-      elements.muteBtn.textContent = state.isMuted ? '🔇' : '🔊';
-      elements.muteBtn.setAttribute('aria-label', state.isMuted ? 'Unmute Audio' : 'Mute Audio');
+      elements.muteBtn.textContent = state.isMuted ? 'UNMUTE' : 'MUTE';
+      elements.muteBtn.style.color = state.isMuted ? 'var(--color-amber)' : 'var(--color-bone-muted)';
     });
   }
 
@@ -592,33 +624,48 @@ export function init() {
     });
   }
 
-  // Initialize Visualizer Manager
-  const wheelCanvas = document.getElementById('wheel-canvas');
-  const scopeCanvas = document.getElementById('scope-canvas');
-  const overlayWheelCanvas = document.getElementById('overlay-wheel-canvas');
-  visualizer = new VisualizerManager(wheelCanvas, scopeCanvas, overlayWheelCanvas);
-  visualizer.start();
-
-  // Keyboard shortcuts (Space = Toggle Tune In, M = Toggle Mute)
+  // Keyboard shortcuts (Space = Tune/Mute, R = Replay, B = Band)
   window.addEventListener('keydown', (e) => {
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
     if (e.code === 'Space') {
       e.preventDefault();
       toggleAudio();
+    } else if (e.code === 'KeyR') {
+      e.preventDefault();
+      const tabReplay = document.getElementById('tab-replay');
+      if (tabReplay) tabReplay.click();
+    } else if (e.code === 'KeyB') {
+      e.preventDefault();
+      const tabBand = document.getElementById('tab-band');
+      if (tabBand) tabBand.click();
     } else if (e.code === 'KeyM') {
       e.preventDefault();
-      state.isMuted = !state.isMuted;
-      audioEngine.setMute(state.isMuted);
-      if (elements.muteBtn) {
-        elements.muteBtn.textContent = state.isMuted ? '🔇' : '🔊';
-        elements.muteBtn.setAttribute('aria-label', state.isMuted ? 'Unmute Audio' : 'Mute Audio');
-      }
+      if (elements.muteBtn) elements.muteBtn.click();
+    } else if (e.code === 'ArrowRight' && replayPlayer?.isPlaying) {
+      const nextHour = (replayPlayer.currentHourIndex + 1) % 24;
+      replayPlayer.play(nextHour);
+    } else if (e.code === 'ArrowLeft' && replayPlayer?.isPlaying) {
+      const prevHour = (replayPlayer.currentHourIndex + 23) % 24;
+      replayPlayer.play(prevHour);
     }
   });
+
+  // Legacy Visualizer support for overlay canvas
+  const overlayWheelCanvas = document.getElementById('overlay-wheel-canvas');
+  if (overlayWheelCanvas) {
+    visualizer = new VisualizerManager(null, null, overlayWheelCanvas);
+    visualizer.start();
+  }
 
   setupReplayControls();
   setupBandControls();
   startPolling();
+
+  // If demo mode, pre-populate demo band
+  if (state.isDemo) {
+    loadBandTokens(getDemoBandTokens());
+  }
 }
 
 // Automatically initialize if running in browser window

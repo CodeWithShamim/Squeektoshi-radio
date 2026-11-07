@@ -1,0 +1,69 @@
+/* ==========================================================================
+   Squeektoshi Radio — Design System Tokens
+   Shared by index.html (landing) and app.html (station console)
+   Colors: Ink #0b0b0e, Bone #e9e6dc, Signal Amber #ffb23e, Data Blue #5b8cff
+   ========================================================================== */
+
+/* 1. Self-hosted Typography */
+@font-face {
+  font-family: 'Cinzel';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('assets/fonts/cinzel.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Cinzel';
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url('assets/fonts/cinzel.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('assets/fonts/ibm-plex-mono-regular.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('assets/fonts/ibm-plex-mono-semibold.woff2') format('woff2');
+}
+
+/* 2. Variables */
+:root {
+  /* Colors */
+  --color-ink: #0b0b0e;
+  --color-bone: #e9e6dc;
+  --color-bone-muted: rgba(233, 230, 220, 0.75);
+  --color-bone-subtle: rgba(233, 230, 220, 0.68);
+  --color-hairline: rgba(233, 230, 220, 0.12);
+  --color-hairline-bright: rgba(233, 230, 220, 0.24);
+  
+  --color-amber: #ffb23e;
+  --color-amber-muted: rgba(255, 178, 62, 0.28);
+  --color-blue: #5b8cff;
+  --color-blue-muted: rgba(91, 140, 255, 0.24);
+  
+  /* Typography */
+  --font-display: 'Cinzel', Georgia, 'Times New Roman', serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, Menlo, Monaco, Consolas, monospace;
+  
+  /* Motion Constants (Strict 2 durations & 1 easing) */
+  --duration-short: 0.6s;
+  --duration-long: 1.2s;
+  --ease-motion: cubic-bezier(0.22, 1, 0.36, 1);
+  
+  /* Grid & Spacing */
+  --page-margin: 2rem;
+  --header-height: 52px;
+  --bottom-bar-height: 72px;
+}
+
