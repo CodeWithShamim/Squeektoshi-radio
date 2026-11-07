@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Squeektoshi Radio — Hamster-Powered Generative Music Station</title>
+  <meta name="description" content="A live generative music station running entirely in the browser, driven by Squeektoshi's hamster-wheel proof-of-work on Squeekchain.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🐹</text></svg>">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="app-body">
+  <!-- OBS / Stream Overlay Mode View (?overlay=1) -->
+  <aside id="overlay-container" class="overlay-container" aria-label="Stream Overlay">
+    <canvas id="overlay-wheel-canvas" class="overlay-wheel" width="120" height="120" aria-label="Overlay Wheel"></canvas>
+    <div class="overlay-stats">
+      <div class="overlay-stat-item">
+        <span class="overlay-stat-label">Mood</span>
+        <span id="overlay-mood" class="overlay-stat-value gold">IDLE</span>
+      </div>
+      <div class="overlay-stat-item">
+        <span class="overlay-stat-label">Tempo</span>
+        <span id="overlay-bpm" class="overlay-stat-value">48 BPM</span>
+      </div>
+      <div class="overlay-stat-item">
+        <span class="overlay-stat-label">Block</span>
+        <span id="overlay-block" class="overlay-stat-value blue">#0</span>
+      </div>
+      <div class="overlay-stat-item">
+        <span class="overlay-stat-label">Progress</span>
+        <span id="overlay-progress" class="overlay-stat-value">0%</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Top Navigation Bar with Back to Landing -->
+  <nav class="site-nav" aria-label="Main Navigation">
+    <div class="nav-container">
+      <div style="display: flex; align-items: center; gap: 1rem;">
+        <a href="/" class="back-to-landing" aria-label="Back to Landing Page">
+          <span aria-hidden="true">←</span>
+          <span>Landing</span>
+        </a>
+        <a href="app.html" class="brand-link" aria-label="Squeektoshi Radio Home">
+          <div class="brand-icon" aria-hidden="true">📻</div>
+          <div class="brand-name">Squeektoshi <span>Radio</span></div>
+        </a>
+      </div>
+
+      <div class="nav-links">
+        <a href="#app-station" class="nav-link">Live Station</a>
+        <a href="#replay-panel" class="nav-link">24h Replay</a>
+        <a href="#band-section" class="nav-link">NFT Band</a>
+        <a href="#how-it-works" class="nav-link">How It Works</a>
+        <a href="https://github.com/CodeWithShamim/Squeektoshi-radio" target="_blank" rel="noopener noreferrer" class="nav-link">GitHub</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main Radio Station App Console -->
+  <main class="app-container" id="app-station">
+    <!-- Header -->
+    <header class="station-header">
+      <div class="brand-title-group">
+        <div class="brand-icon" aria-hidden="true">📻</div>
+        <div>
+          <h1 class="station-console-title" style="font-size: 1.25rem; font-weight: 800; letter-spacing: -0.02em;">Live Station <span style="color: var(--gold-primary);">Console</span></h1>
+        </div>
+      </div>
+      <div class="header-status-strip">
+        <span id="signal-badge" class="freshness-pill">
+          <span id="signal-dot" class="freshness-dot"></span>
+          <span id="signal-text">Connecting...</span>
+        </span>
+        <span id="demo-badge" class="freshness-pill" style="display: none; border-color: var(--gold-primary); color: var(--gold-primary);">DEMO MODE</span>
+      </div>
+    </header>
+
+    <!-- Signal Lost / Offline Alert Banner -->
+    <section id="status-banner" class="status-banner" role="alert" aria-live="polite">
+      <span>⚠️ <strong>Signal lost</strong>: Telemetry is temporarily stale or unavailable. Continuing to play last known frequency quietly.</span>
+      <button id="banner-dismiss" class="btn-secondary" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;">Dismiss</button>
+    </section>
+
+    <!-- Main Grid: Radio Tuner + Visualizer Stage -->
+    <div class="station-grid">
+      <!-- Left: Radio Tuner & Telemetry Panel -->
+      <section class="radio-panel" aria-label="Radio Control and Live Status">
+        <!-- Big Tune In Button -->
+        <button id="tune-btn" class="tune-button" aria-pressed="false">
+          <span id="tune-icon" aria-hidden="true">📻</span>
+          <span id="tune-text">Tune In</span>
+        </button>
+
+        <!-- Volume & Mute Controls -->
+        <div class="audio-controls">
+          <button id="mute-btn" class="mute-btn" aria-label="Mute Audio" title="Mute">🔊</button>
+          <input type="range" id="volume-slider" class="volume-slider" min="0" max="1" step="0.01" value="0.75" aria-label="Volume">
+        </div>
+
+        <!-- Live Telemetry Badges -->
+        <div class="telemetry-list">
+          <div class="telemetry-row">
+            <span class="telemetry-label">Hamster Mood</span>
+            <span id="badge-mood" class="mood-badge sleep" aria-live="polite">SLEEP</span>
+          </div>
+          <div class="telemetry-row">
+            <span class="telemetry-label">Wheel Speed</span>
+            <span id="val-rpm" class="telemetry-value">0.0 RPM</span>
+          </div>
+          <div class="telemetry-row">
+            <span class="telemetry-label">Station Tempo</span>
+            <span id="val-bpm" class="telemetry-value gold">48 BPM</span>
+          </div>
+          <div class="telemetry-row">
+            <span class="telemetry-label">Key & Scale</span>
+            <span id="val-key" class="telemetry-value blue">C Minor Pentatonic</span>
+          </div>
+          <div class="telemetry-row">
+            <span class="telemetry-label">Squeek Block</span>
+            <span id="val-block-height" class="telemetry-value">#0</span>
+          </div>
+          <div class="telemetry-row">
+            <span class="telemetry-label">SQK Minted</span>
+            <span id="val-sqk-minted" class="telemetry-value gold">0 SQK</span>
+          </div>
+        </div>
+
+        <!-- Block Progress Filter Meter -->
+        <div class="progress-container">
+          <div class="progress-header">
+            <span>Block Progress (Filter Opening)</span>
+            <span id="val-progress-pct">0%</span>
+          </div>
+          <div class="progress-bar-track" role="progressbar" aria-label="Squeek Block Progress" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" id="progress-track">
+            <div id="progress-bar-fill" class="progress-bar-fill"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Right: Live Visualizer Stage -->
+      <section class="visualizer-stage" aria-label="Visualizer Stage">
+        <nav class="station-modes" aria-label="Station Modes">
+          <button id="tab-live" class="mode-tab-btn active">Live Station</button>
+          <button id="tab-replay" class="mode-tab-btn">Replay 24 Hours</button>
+        </nav>
+
+        <div class="visualizer-canvases">
+          <div class="canvas-card">
+            <span class="canvas-title">WHEELY9000</span>
+            <canvas id="wheel-canvas" width="400" height="400" aria-label="Hamster Wheel Visualizer"></canvas>
+          </div>
+          <div class="canvas-card">
+            <span class="canvas-title">Harmonic Oscilloscope</span>
+            <canvas id="scope-canvas" width="600" height="400" aria-label="Audio Waveform Spectrum"></canvas>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- Replay The Day Panel (F2) -->
+    <section id="replay-panel" class="replay-panel" aria-label="24h History Replay">
+      <div class="band-header">
+        <div class="band-title-group">
+          <h2>Replay the Last 24 Hours</h2>
+          <p>A deterministic 2-minute composition scoring the past 24 hourly buckets by wheel work tertiles.</p>
+        </div>
+        <button id="replay-play-btn" class="btn-secondary">▶ Play 24h Symphony</button>
+      </div>
+      <div class="timeline-scrubber">
+        <div id="timeline-buckets" class="timeline-buckets"></div>
+        <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-secondary);">
+          <span id="replay-start-time">24h ago</span>
+          <span id="replay-current-hour" class="telemetry-value gold">Hour 0/24</span>
+          <span id="replay-end-time">Now</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Squeek Band Section (F3) -->
+    <section id="band-section" class="band-section" aria-label="Your Squeeks in the Band">
+      <div class="band-header">
+        <div class="band-title-group">
+          <h2>Your Squeeks Are the Band</h2>
+          <p>Paste any Ethereum wallet address. Held and deposited Squeek NFTs join the stream as synthesized instruments.</p>
+        </div>
+        <form id="wallet-form" class="wallet-form" onsubmit="return false;">
+          <input type="text" id="wallet-input" class="wallet-input" placeholder="0x... (e.g. 0x798cf7770337a9283b6f2af69a8f079b3d7544dc)" aria-label="Ethereum Wallet Address" spellcheck="false" autocomplete="off">
+          <button type="submit" id="wallet-load-btn" class="btn-secondary">Join Band</button>
+          <button type="button" id="demo-band-btn" class="btn-secondary" title="Load sample band">Demo Band</button>
+        </form>
+      </div>
+
+      <div id="band-status-msg" style="font-size: 0.85rem; color: var(--text-secondary); display: none;"></div>
+      <div id="band-cards-grid" class="band-cards-grid">
+        <!-- Rendered Squeek cards appear here -->
+      </div>
+    </section>
+
+    <!-- How It Works & Proof Limits Panel (F6) -->
+    <section id="how-it-works" class="info-section" aria-label="How It Works & Proof Limits">
+      <h3>How Squeektoshi Radio Works</h3>
+      <p>
+        Squeektoshi Radio translates physical proof-of-work telemetry from the WHEELY9000 sensor on Squeekchain into a continuous generative soundscape. Wheel rotations modulate tempo and rhythmic density, block heights establish root keys, and completed rounds trigger harmonic shifts.
+      </p>
+      <p>
+        <strong>Proof Limits & Boundaries</strong>: Sensor records indicate accepted magnet passages under configured device thresholds. They verify hardware reporting history and Ethereum settlement, but do not prove biological identity or direction of movement. Read the complete <a href="https://docs.squeekchain.com/security/proof-limits/" target="_blank" rel="noopener noreferrer">What the system proves</a> documentation.
+      </p>
+    </section>
+  </main>
+
+  <!-- Site Footer -->
+  <footer class="site-footer">
+    <div class="footer-container">
+      <div class="footer-brand">
+        <div style="font-weight: 700; font-size: 1rem;">🐹 Squeektoshi Radio</div>
+        <div style="font-size: 0.8rem; color: var(--text-muted);">Hamster-Powered Generative Music on Squeekchain Telemetry</div>
+      </div>
+      <div class="footer-links">
+        <a href="/" class="footer-link">Landing Page</a>
+        <a href="#app-station" class="footer-link">Back to Top</a>
+        <a href="https://docs.squeekchain.com" target="_blank" rel="noopener noreferrer" class="footer-link">Squeekchain Docs</a>
+        <a href="https://github.com/CodeWithShamim/Squeektoshi-radio" target="_blank" rel="noopener noreferrer" class="footer-link">GitHub Repository</a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Main ES Module Entry Point -->
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>

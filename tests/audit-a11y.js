@@ -2,13 +2,14 @@ import { chromium } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
 async function runAccessibilityAudit() {
-  console.log('Running Axe Accessibility Audit on http://localhost:3000/ ...');
+  const targetUrl = process.argv[2] || 'http://localhost:3000/app.html';
+  console.log(`Running Axe Accessibility Audit on ${targetUrl} ...`);
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext();
   const page = await context.newPage();
 
   try {
-    await page.goto('http://localhost:3000/', { waitUntil: 'networkidle' });
+    await page.goto(targetUrl, { waitUntil: 'networkidle' });
 
     const accessibilityScanResults = await new AxeBuilder({ page })
       .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'best-practice'])

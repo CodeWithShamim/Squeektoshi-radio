@@ -7,7 +7,7 @@ test.describe('Squeektoshi Radio - End-to-End Test Suite', () => {
       if (msg.type() === 'error') consoleErrors.push(msg.text());
     });
 
-    await page.goto('/?demo');
+    await page.goto('/app.html?demo');
 
     // Page title and header
     await expect(page).toHaveTitle(/Squeektoshi Radio/);
@@ -56,7 +56,7 @@ test.describe('Squeektoshi Radio - End-to-End Test Suite', () => {
       });
     });
 
-    await page.goto('/');
+    await page.goto('/app.html');
     await page.waitForTimeout(1000);
 
     // Should be in zoomies mood (75 RPM)
@@ -120,7 +120,7 @@ test.describe('Squeektoshi Radio - End-to-End Test Suite', () => {
       }
     });
 
-    await page.goto('/');
+    await page.goto('/app.html');
     await page.waitForTimeout(1000);
 
     const moodBadge = page.locator('#badge-mood');
@@ -144,7 +144,7 @@ test.describe('Squeektoshi Radio - End-to-End Test Suite', () => {
   });
 
   test('OBS stream overlay mode (?overlay=1) hides controls and shows overlay widget', async ({ page }) => {
-    await page.goto('/?overlay=1');
+    await page.goto('/app.html?overlay=1');
 
     await expect(page.locator('body')).toHaveClass(/overlay-mode/);
     await expect(page.locator('#overlay-container')).toBeVisible();

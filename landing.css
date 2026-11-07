@@ -1,0 +1,540 @@
+/* ==========================================================================
+   Squeektoshi Radio — Landing Page Stylesheet
+   Art Direction: Technical drawing / Observatory instrument
+   Palette: Near-black #0b0b0e, Bone #e9e6dc, Signal Amber #ffb23e, Brand Blue #5b8cff
+   ========================================================================== */
+
+/* 1. Self-hosted Fonts */
+@font-face {
+  font-family: 'Cinzel';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('assets/fonts/cinzel.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Cinzel';
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url('assets/fonts/cinzel.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('assets/fonts/ibm-plex-mono-regular.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('assets/fonts/ibm-plex-mono-semibold.woff2') format('woff2');
+}
+
+/* 2. Custom Properties */
+:root {
+  --color-bg: #0b0b0e;
+  --color-bone: #e9e6dc;
+  --color-bone-muted: rgba(233, 230, 220, 0.65);
+  --color-bone-subtle: rgba(233, 230, 220, 0.28);
+  --color-hairline: rgba(233, 230, 220, 0.08);
+  --color-hairline-bright: rgba(233, 230, 220, 0.18);
+  
+  --color-amber: #ffb23e;
+  --color-amber-muted: rgba(255, 178, 62, 0.3);
+  --color-blue: #5b8cff;
+  
+  --font-display: 'Cinzel', Georgia, 'Times New Roman', serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, Menlo, Monaco, Consolas, monospace;
+  
+  --ease-reveal: cubic-bezier(0.22, 1, 0.36, 1);
+  --duration-short: 0.6s;
+  --duration-long: 1.2s;
+  
+  --grid-columns: 12;
+  --grid-gutter: 1.5rem;
+  --page-margin: 2rem;
+}
+
+/* 3. Base & Reset */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  background-color: var(--color-bg);
+  color: var(--color-bone);
+  font-family: var(--font-mono);
+  font-size: 14px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: var(--color-bg);
+  color: var(--color-bone);
+  overflow-x: hidden;
+  position: relative;
+  min-height: 100vh;
+}
+
+/* 4. Film Grain Overlay */
+.film-grain {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 999;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+}
+
+/* 5. Visible 12-Column Hairline Grid Overlay */
+.hairline-grid-container {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 10;
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  padding: 0 var(--page-margin);
+  border-left: 1px solid var(--color-hairline);
+  border-right: 1px solid var(--color-hairline);
+}
+
+.grid-line-col {
+  height: 100%;
+  border-right: 1px solid var(--color-hairline);
+}
+
+.grid-line-col:last-child {
+  border-right: none;
+}
+
+/* Corner datum cross markers */
+.datum-cross {
+  position: absolute;
+  width: 11px;
+  height: 11px;
+  color: var(--color-bone-subtle);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 11px;
+  user-select: none;
+  pointer-events: none;
+}
+.datum-cross-tl { top: var(--page-margin); left: var(--page-margin); }
+.datum-cross-tr { top: var(--page-margin); right: var(--page-margin); }
+.datum-cross-bl { bottom: var(--page-margin); left: var(--page-margin); }
+.datum-cross-br { bottom: var(--page-margin); right: var(--page-margin); }
+
+/* 6. Fixed HUD Bar (Technical Readout in 4 Corners) */
+.hud-layer {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 1.25rem var(--page-margin);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-bone-muted);
+}
+
+.hud-top-row, .hud-bottom-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  width: 100%;
+}
+
+.hud-group {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.hud-item {
+  display: inline-flex;
+  gap: 0.45rem;
+}
+
+.hud-label {
+  color: var(--color-bone-subtle);
+}
+
+.hud-val {
+  color: var(--color-bone);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-val.data-blue {
+  color: var(--color-blue);
+}
+
+.hud-val.amber {
+  color: var(--color-amber);
+}
+
+.hud-val.unknown {
+  color: var(--color-bone-muted);
+}
+
+/* 7. Canvas & SVG Wheel Container */
+.scene-container {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 20;
+  pointer-events: none;
+}
+
+#webgl-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Fallback SVG Wheel (visible when WebGL is absent or failing) */
+.fallback-wheel-svg {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(80vw, 560px);
+  height: min(80vw, 560px);
+  display: none;
+  pointer-events: none;
+  opacity: 0.85;
+}
+
+body.webgl-fallback .fallback-wheel-svg {
+  display: block;
+  animation: slow-svg-spin 40s linear infinite;
+}
+
+body.webgl-fallback #webgl-canvas {
+  display: none;
+}
+
+@keyframes slow-svg-spin {
+  from { transform: translate(-50%, -50%) rotate(0deg); }
+  to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+/* 8. Pinned Scroll Narrative Sections */
+.scroll-viewport {
+  position: relative;
+  z-index: 30;
+  width: 100%;
+}
+
+.scroll-section {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 4rem var(--page-margin);
+  max-width: 1440px;
+  margin: 0 auto;
+  position: relative;
+}
+
+/* Masked text reveal containers */
+.mask-line-wrapper {
+  overflow: hidden;
+  display: block;
+  line-height: 1.15;
+}
+
+.mask-line {
+  display: block;
+  transform: translateY(0);
+  transition: transform var(--duration-long) var(--ease-reveal);
+}
+
+/* Eyebrow */
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--color-bone-muted);
+  margin-bottom: 1.25rem;
+}
+
+.eyebrow-rule {
+  display: inline-block;
+  width: 28px;
+  height: 1px;
+  background-color: var(--color-hairline-bright);
+  vertical-align: middle;
+  margin-right: 0.75rem;
+}
+
+/* Monumental Display Headline */
+.hero-headline {
+  font-family: var(--font-display);
+  font-size: clamp(3rem, 9.5vw, 8.5rem);
+  font-weight: 800;
+  line-height: 0.95;
+  letter-spacing: -0.03em;
+  text-transform: uppercase;
+  color: var(--color-bone);
+  margin-bottom: 2rem;
+  max-width: 14ch;
+}
+
+/* Subtitle */
+.hero-subtitle {
+  font-family: var(--font-mono);
+  font-size: clamp(1rem, 2vw, 1.45rem);
+  line-height: 1.5;
+  color: var(--color-bone-muted);
+  max-width: 48ch;
+  margin-bottom: 2.75rem;
+  letter-spacing: -0.01em;
+}
+
+/* CTA Buttons & Technical Links */
+.cta-group {
+  display: flex;
+  align-items: center;
+  gap: 2.5rem;
+  pointer-events: auto;
+}
+
+.btn-launch-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.9rem 2.4rem;
+  background-color: transparent;
+  color: var(--color-amber);
+  border: 1px solid var(--color-amber);
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  text-decoration: none;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: color var(--duration-short) var(--ease-reveal), background-color var(--duration-short) var(--ease-reveal), border-color var(--duration-short) var(--ease-reveal);
+}
+
+.btn-launch-primary:hover, .btn-launch-primary:focus-visible {
+  background-color: var(--color-amber);
+  color: #0b0b0e;
+  outline: none;
+  box-shadow: 0 0 24px rgba(255, 178, 62, 0.3);
+}
+
+.btn-launch-primary:focus-visible {
+  outline: 2px solid var(--color-bone);
+  outline-offset: 4px;
+}
+
+.link-secondary-how {
+  color: var(--color-bone-muted);
+  text-decoration: none;
+  font-family: var(--font-mono);
+  font-size: 0.88rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--color-hairline-bright);
+  padding-bottom: 2px;
+  transition: color var(--duration-short) var(--ease-reveal), border-color var(--duration-short) var(--ease-reveal);
+}
+
+.link-secondary-how:hover, .link-secondary-how:focus-visible {
+  color: var(--color-bone);
+  border-bottom-color: var(--color-bone);
+  outline: none;
+}
+
+/* Chapters 01, 02, 03 */
+.chapter-content {
+  max-width: 680px;
+}
+
+.chapter-number {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.2em;
+  color: var(--color-amber);
+  text-transform: uppercase;
+  margin-bottom: 0.85rem;
+  display: block;
+}
+
+.chapter-statement {
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 5.5vw, 4.4rem);
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: var(--color-bone);
+  margin-bottom: 1.5rem;
+}
+
+.chapter-description {
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+  color: var(--color-bone-muted);
+  line-height: 1.7;
+  max-width: 48ch;
+}
+
+/* Closing Section */
+.closing-section {
+  text-align: center;
+  align-items: center;
+}
+
+.closing-statement {
+  font-family: var(--font-display);
+  font-size: clamp(2.4rem, 7vw, 5.5rem);
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+  color: var(--color-bone);
+  margin-bottom: 2.5rem;
+}
+
+/* 9. Landing Footer */
+.landing-footer {
+  position: relative;
+  z-index: 40;
+  border-top: 1px solid var(--color-hairline);
+  padding: 2rem var(--page-margin);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--color-bone-muted);
+}
+
+.footer-copy {
+  letter-spacing: 0.05em;
+}
+
+.footer-links-group {
+  display: flex;
+  gap: 1.5rem;
+}
+
+.footer-link {
+  color: var(--color-bone-muted);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: color var(--duration-short) var(--ease-reveal), border-color var(--duration-short) var(--ease-reveal);
+}
+
+.footer-link:hover, .footer-link:focus-visible {
+  color: var(--color-bone);
+  border-bottom-color: var(--color-bone);
+}
+
+/* 10. Amber Wipe Transition Overlay */
+.wipe-overlay {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 10000;
+  pointer-events: none;
+  background: transparent;
+  transform: translateX(-100%);
+  border-right: 3px solid var(--color-amber);
+}
+
+.wipe-overlay.active {
+  background-color: var(--color-bg);
+  transform: translateX(0%);
+  transition: transform 0.6s cubic-bezier(0.85, 0, 0.15, 1);
+}
+
+/* 11. Reduced Motion Preference */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  
+  .mask-line {
+    transform: none !important;
+  }
+  
+  .wipe-overlay {
+    display: none !important;
+  }
+  
+  body.webgl-fallback .fallback-wheel-svg {
+    animation: none !important;
+  }
+}
+
+/* 12. Responsive Adjustments */
+@media (max-width: 768px) {
+  :root {
+    --page-margin: 1.25rem;
+  }
+  
+  .datum-cross {
+    display: none;
+  }
+  
+  .hud-layer {
+    padding: 0.85rem var(--page-margin);
+    font-size: 0.65rem;
+  }
+  
+  .hud-group {
+    gap: 0.85rem;
+  }
+  
+  .hud-top-row, .hud-bottom-row {
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+  
+  .cta-group {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1.25rem;
+  }
+  
+  .landing-footer {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

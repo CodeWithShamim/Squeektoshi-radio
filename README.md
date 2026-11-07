@@ -93,22 +93,28 @@ npx serve -l 3000 .
 ```
 
 Open your browser to:
-- **Live Station**: [http://localhost:3000/](http://localhost:3000/)
-- **Demo Mode**: [http://localhost:3000/?demo](http://localhost:3000/?demo)
-- **Stream Overlay**: [http://localhost:3000/?overlay=1](http://localhost:3000/?overlay=1)
+- **Observatory 3D Landing Page**: [http://localhost:3000/](http://localhost:3000/)
+- **Live Station Studio App**: [http://localhost:3000/app.html](http://localhost:3000/app.html)
+- **Demo Mode**: [http://localhost:3000/app.html?demo](http://localhost:3000/app.html?demo)
+- **Stream Overlay**: [http://localhost:3000/app.html?overlay=1](http://localhost:3000/app.html?overlay=1)
+
+> **Important Audio Gesture Note**: Navigating between pages in any modern browser resets user audio permission. Therefore, clicking **Launch** opens `app.html` in an unmuted but idle audio state; audio playback intentionally begins only after an explicit click on the **Tune In** button on `app.html`.
 
 ---
 
 ## 🧪 Testing & Verification
 
-The test suite includes pure mapping tests, replay determinism tests, API parsing tests, and Playwright end-to-end tests:
+The test suite includes pure mapping tests, replay determinism tests, API parsing tests, automated WCAG accessibility audits, and Playwright end-to-end tests for both the 3D landing page and the app studio:
 
 ```bash
 # Run all unit tests (Node.js native test runner - 21 tests)
 npm run test:unit
 
-# Run Playwright end-to-end tests (mocked & live routes - 4 tests)
+# Run Playwright end-to-end tests (mocked & live routes - 9 tests)
 npm run test:e2e
+
+# Run Axe WCAG 2.1 AA accessibility audit (100/100 score)
+node tests/audit-a11y.js
 
 # Generate the 1200x630 social card
 npm run card
@@ -119,10 +125,10 @@ npm run card
 ## 📺 Adding to OBS Studio as a Stream Overlay
 
 1. In OBS Studio, add a new source: **Browser**.
-2. Set the URL to your deployed URL or `http://localhost:3000/?overlay=1`.
+2. Set the URL to your deployed URL or `http://localhost:3000/app.html?overlay=1`.
 3. Set Width to `500` and Height to `180` (or resize as desired).
 4. Check **Control audio via OBS** if you wish to route the radio station's audio into OBS's audio mixer.
-5. (Optional) For chroma keying with green background, append `&chroma=1`: `http://localhost:3000/?overlay=1&chroma=1`, then add a **Chroma Key** filter in OBS with Key Color Type: *Green*.
+5. (Optional) For chroma keying with green background, append `&chroma=1`: `http://localhost:3000/app.html?overlay=1&chroma=1`, then add a **Chroma Key** filter in OBS with Key Color Type: *Green*.
 
 ---
 
