@@ -271,23 +271,34 @@ export class CentralDial {
     }
 
     // 6. Audio-Reactive Waveform on 2D Canvas
-    this.renderWaveform();
+    this.renderWaveform(now);
   }
 
-  renderWaveform() {
+  renderWaveform(now = 0) {
     if (!this.ctx || !this.canvas) return;
 
     this.ctx.clearRect(0, 0, 600, 600);
 
     const baseRadius = 160;
     const center = 300;
+    const timeSec = (now || performance.now()) * 0.001;
 
     if (!this.analyser || !this.timeDomainBuffer) {
-      // Draw quiet phosphor hairline circle when audio is inactive
+      // Draw living phosphor hairline circle with subtle breathing ripple when audio is in standby
       this.ctx.beginPath();
-      this.ctx.arc(center, center, baseRadius, 0, Math.PI * 2);
-      this.ctx.strokeStyle = 'rgba(91, 140, 255, 0.20)';
-      this.ctx.lineWidth = 1;
+      const steps = 64;
+      for (let s = 0; s <= steps; s++) {
+        const angle = (s / steps) * Math.PI * 2;
+        const ripple = Math.sin(timeSec * 2.5 + angle * 6) * 2.5 + Math.sin(timeSec * 1.1 + angle * 3) * 1.5;
+        const r = baseRadius + ripple;
+        const x = center + Math.cos(angle) * r;
+        const y = center + Math.sin(angle) * r;
+        if (s === 0) this.ctx.moveTo(x, y);
+        else this.ctx.lineTo(x, y);
+      }
+      this.ctx.closePath();
+      this.ctx.strokeStyle = this.mood === 'zoomies' ? 'rgba(255, 178, 62, 0.65)' : 'rgba(91, 140, 255, 0.55)';
+      this.ctx.lineWidth = 1.2;
       this.ctx.stroke();
       return;
     }
@@ -303,7 +314,9 @@ export class CentralDial {
       const angle = (i / stride) * step;
       // Byte values range 0 to 255 (128 is center/silence)
       const amplitude = (this.timeDomainBuffer[i] - 128) / 128.0;
-      const modRadius = baseRadius + amplitude * 24;
+      // Ambient ripple ensures the ring ripples organic phosphor waves even during quiet intervals in sleep mood
+      const idleRipple = Math.sin(timeSec * 2.2 + angle * 6) * 2.2 + Math.sin(timeSec * 0.9 + angle * 3) * 1.4;
+      const modRadius = baseRadius + amplitude * 28 + idleRipple;
 
       const x = center + Math.cos(angle) * modRadius;
       const y = center + Math.sin(angle) * modRadius;
@@ -316,7 +329,7 @@ export class CentralDial {
     }
 
     this.ctx.closePath();
-    this.ctx.strokeStyle = this.mood === 'zoomies' ? 'rgba(255, 178, 62, 0.85)' : 'rgba(91, 140, 255, 0.75)';
+    this.ctx.strokeStyle = this.mood === 'zoomies' ? 'rgba(255, 178, 62, 0.95)' : 'rgba(91, 140, 255, 0.85)';
     this.ctx.lineWidth = 1.6;
     this.ctx.stroke();
   }

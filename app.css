@@ -215,6 +215,51 @@ body.app-body {
   background-color: var(--color-bone-subtle);
 }
 
+.signal-indicator-dot.buffering {
+  background-color: var(--color-amber);
+  box-shadow: 0 0 8px var(--color-amber);
+  animation: pulse-amber-dot 0.8s ease-in-out infinite alternate;
+}
+
+/* Floating Station Buffering HUD */
+.station-buffering-hud {
+  position: fixed;
+  top: 4.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  background-color: rgba(18, 14, 10, 0.94);
+  border: 1px solid var(--color-amber);
+  padding: 0.4rem 0.9rem;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: var(--color-amber);
+  text-transform: uppercase;
+  user-select: none;
+  pointer-events: none;
+  box-shadow: 0 0 16px rgba(255, 178, 62, 0.35);
+  animation: pulse-amber-glow 2.4s ease-in-out infinite;
+}
+
+.station-buffering-hud .buffering-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--color-amber);
+  box-shadow: 0 0 8px var(--color-amber);
+  animation: pulse-amber-dot 1s ease-in-out infinite alternate;
+}
+
+@keyframes pulse-amber-dot {
+  0% { opacity: 0.4; transform: scale(0.85); }
+  100% { opacity: 1; transform: scale(1.2); }
+}
+
 /* 2. Alert Banner (Signal Unknown) */
 .station-alert-banner {
   display: none;

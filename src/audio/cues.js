@@ -348,13 +348,13 @@ export class CueManager {
    * @private
    */
   canPlay() {
-    return Boolean(
-      this.enabled &&
-      this.hasUserInteracted &&
-      this.ctx &&
-      this.ctx.state === 'running' &&
-      this.cueBusGain
-    );
+    if (!this.enabled || !this.hasUserInteracted || !this.ctx || !this.cueBusGain) {
+      return false;
+    }
+    if (this.ctx.state === 'suspended') {
+      this.ctx.resume().catch(() => {});
+    }
+    return this.ctx.state === 'running' || this.ctx.state === 'suspended';
   }
 
   /**

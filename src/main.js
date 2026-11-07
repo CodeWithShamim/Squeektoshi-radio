@@ -1557,7 +1557,7 @@ export async function tuneIn(fromGesture = false) {
       }
     }
     await audioEngine.start();
-    if (audioEngine.ctx && audioEngine.ctx.state === 'running') {
+    if (audioEngine.ctx) {
       if (cueManager) {
         cueManager.unlock();
         cueManager.init(audioEngine.ctx);
@@ -1789,6 +1789,12 @@ export function init() {
       }
       if (audioEngine.ctx) {
         cueManager.init(audioEngine.ctx);
+        if (bgWaveform && audioEngine.analyser && !bgWaveform.analyser) {
+          bgWaveform.setAnalyser(audioEngine.analyser);
+        }
+        if (centralDial && audioEngine.analyser && !centralDial.analyser) {
+          centralDial.setAnalyser(audioEngine.analyser);
+        }
       }
       const newState = cueManager.toggle();
       updateCueBtn(newState);
@@ -1806,6 +1812,51 @@ export function init() {
     onRetry: () => {
       tuneIn(true);
     },
+  });
+
+  // Subscribe UI and Cues to State Machine Transitions
+  audioStateMachine.addListener((sm) => {
+    const currentState = sm.targetState || sm.state;
+    const cause = sm.cause;
+    const bufferingHud = document.getElementById('station-buffering-hud');
+    const bufferingText = document.getElementById('station-buffering-text');
+    const signalDot = document.getElementById('signal-dot');
+    const signalText = document.getElementById('signal-text');
+
+    if (currentState === AUDIO_STATES.BUFFERING) {
+      if (bufferingHud) {
+        bufferingHud.style.display = 'inline-flex';
+        if (bufferingText) {
+          bufferingText.textContent = cause ? `BUFFERING: ${cause.toUpperCase()}` : 'BUFFERING AUDIO GRAPH...';
+        }
+      }
+      if (signalDot) {
+        signalDot.className = 'signal-indicator-dot buffering';
+      }
+      if (signalText) {
+        signalText.textContent = 'buffering';
+        signalText.style.color = 'var(--color-amber)';
+      }
+      if (cueManager && cueManager.isEnabled()) {
+        cueManager.playWarn();
+      }
+    } else {
+      if (bufferingHud) {
+        bufferingHud.style.display = 'none';
+      }
+      if (signalDot) {
+        signalDot.className = 'signal-indicator-dot live';
+      }
+      if (signalText) {
+        signalText.textContent = state.isDemoMode ? 'Simulated' : (state.isUnknownSignal ? 'unknown' : 'live');
+        signalText.style.color = '';
+      }
+      if (sm.previousState === AUDIO_STATES.BUFFERING && currentState === AUDIO_STATES.PLAYING) {
+        if (cueManager && cueManager.isEnabled()) {
+          cueManager.playReady();
+        }
+      }
+    }
   });
 
   // Background Oscilloscope Waveform Renderer

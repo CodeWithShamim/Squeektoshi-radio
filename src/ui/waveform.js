@@ -238,8 +238,8 @@ export class BackgroundWaveform {
     this.drawLanes(currentState);
     this.drawBlockProgressLine();
     this.drawBeatLine();
-    this.drawWaveformTraces(currentState, smSnapshot, rms);
-    this.drawStateOverlay(smSnapshot);
+    this.drawWaveformTraces(currentState, smSnapshot, rms, now);
+    this.drawStateOverlay(smSnapshot, now);
   }
 
   /**
@@ -253,11 +253,11 @@ export class BackgroundWaveform {
 
     // 1. Horizontal Calibrated Voltage Reference Lines (+1.0V, +0.5V, 0.0V, -0.5V, -1.0V)
     const voltLines = [
-      { offset: -90, label: '+1.0V', dashed: false, alpha: 0.08 },
-      { offset: -45, label: '+0.5V', dashed: true, alpha: 0.05 },
-      { offset: 0, label: ' 0.0V', dashed: false, alpha: 0.12 },
-      { offset: 45, label: '-0.5V', dashed: true, alpha: 0.05 },
-      { offset: 90, label: '-1.0V', dashed: false, alpha: 0.08 },
+      { offset: -90, label: '+1.0V', dashed: false, alpha: 0.16 },
+      { offset: -45, label: '+0.5V', dashed: true, alpha: 0.10 },
+      { offset: 0, label: ' 0.0V', dashed: false, alpha: 0.22 },
+      { offset: 45, label: '-0.5V', dashed: true, alpha: 0.10 },
+      { offset: 90, label: '-1.0V', dashed: false, alpha: 0.16 },
     ];
 
     this.ctx.font = '8px "JetBrains Mono", monospace';
@@ -279,13 +279,13 @@ export class BackgroundWaveform {
       this.ctx.stroke();
 
       // Right-edge voltage label
-      this.ctx.fillStyle = `rgba(91, 140, 255, ${Math.min(0.35, alpha * 3.5)})`;
+      this.ctx.fillStyle = `rgba(91, 140, 255, ${Math.min(0.65, alpha * 3.8)})`;
       this.ctx.fillText(label, this.width - 25, y);
     });
 
     // 2. Graticule Reticle Crosshairs (+) at key horizontal intervals
     const divisions = [0.1, 0.25, 0.5, 0.75, 0.9];
-    this.ctx.strokeStyle = 'rgba(91, 140, 255, 0.14)';
+    this.ctx.strokeStyle = 'rgba(91, 140, 255, 0.24)';
     this.ctx.lineWidth = 1;
     this.ctx.setLineDash([]);
 
@@ -307,7 +307,7 @@ export class BackgroundWaveform {
       { x: 24, y: this.height - 76 },
       { x: this.width - 24, y: this.height - 76 },
     ];
-    this.ctx.strokeStyle = 'rgba(91, 140, 255, 0.25)';
+    this.ctx.strokeStyle = 'rgba(91, 140, 255, 0.45)';
     corners.forEach(({ x, y }) => {
       this.ctx.beginPath();
       this.ctx.moveTo(x - 6, y);
@@ -319,7 +319,7 @@ export class BackgroundWaveform {
 
     // 4. Oscilloscope Frame Telemetry Readouts
     this.ctx.font = '9px "JetBrains Mono", monospace';
-    this.ctx.fillStyle = 'rgba(91, 140, 255, 0.32)';
+    this.ctx.fillStyle = 'rgba(91, 140, 255, 0.65)';
 
     // Top Right Status
     this.ctx.textAlign = 'right';
@@ -333,11 +333,16 @@ export class BackgroundWaveform {
   }
 
   /**
-   * Draw horizontal lane hairlines and mono labels with activity ticks on left edge.
+   * Draw horizontal lane hairlines and mono labels with activity ticks.
+   * Positioned cleanly in an unobstructed channel so foreground rails never obscure cues.
    */
   drawLanes(state) {
     const laneHeight = this.height / LANE_NAMES.length;
     this.ctx.save();
+
+    // Position lanes: on desktop, place in channel between left rail and dial; on narrow screens, near left margin
+    const isDesktop = this.width > 1100;
+    const startX = isDesktop ? Math.min(385, Math.floor(this.width * 0.27)) : 24;
 
     for (let i = 0; i < LANE_NAMES.length; i++) {
       const lane = LANE_NAMES[i];
@@ -348,37 +353,37 @@ export class BackgroundWaveform {
         continue;
       }
 
-      // 1. Subtle horizontal lane separation hairline (bone ~4% opacity)
+      // 1. Subtle horizontal lane separation hairline (bone ~6% opacity)
       this.ctx.beginPath();
-      this.ctx.strokeStyle = 'rgba(233, 230, 220, 0.04)';
+      this.ctx.strokeStyle = 'rgba(233, 230, 220, 0.06)';
       this.ctx.lineWidth = 1;
       this.ctx.moveTo(0, y);
       this.ctx.lineTo(this.width, y);
       this.ctx.stroke();
 
-      // 2. Mono label on left edge
+      // 2. Mono label with dynamic illumination on voice pulse
       const level = this.layerLevels[lane] || 0;
-      this.ctx.font = '10px "JetBrains Mono", monospace';
+      this.ctx.font = 'bold 9px "JetBrains Mono", monospace';
       this.ctx.textAlign = 'left';
       this.ctx.textBaseline = 'middle';
 
-      // Label opacity illuminates on active sound
-      const labelOpacity = 0.22 + level * 0.65;
-      this.ctx.fillStyle = `rgba(233, 230, 220, ${labelOpacity.toFixed(2)})`;
-      this.ctx.fillText(lane, 20, y - 6);
+      const labelOpacity = 0.35 + level * 0.65;
+      this.ctx.fillStyle = level > 0.4
+        ? `rgba(255, 178, 62, ${labelOpacity.toFixed(2)})`
+        : `rgba(233, 230, 220, ${labelOpacity.toFixed(2)})`;
+      this.ctx.fillText(lane, startX, y - 6);
 
-      // 3. Level ticks (3 micro ticks showing discrete activity)
-      const tickWidth = 4;
+      // 3. Level ticks (3 micro ticks showing discrete voice activity)
+      const tickWidth = 5;
       const tickGap = 3;
-      const startX = 20;
-      const tickY = y + 5;
+      const tickY = y + 4;
 
       for (let t = 0; t < 3; t++) {
         const tickThreshold = (t + 1) / 3;
-        const isLit = level >= tickThreshold * 0.7;
+        const isLit = level >= tickThreshold * 0.65;
         this.ctx.fillStyle = isLit
-          ? 'rgba(255, 178, 62, 0.75)' // amber
-          : 'rgba(233, 230, 220, 0.12)'; // faint bone
+          ? 'rgba(255, 178, 62, 0.95)' // bright amber
+          : 'rgba(233, 230, 220, 0.20)'; // faint bone
         this.ctx.fillRect(startX + t * (tickWidth + tickGap), tickY, tickWidth, 2);
       }
     }
@@ -423,8 +428,10 @@ export class BackgroundWaveform {
 
   /**
    * Draw master waveform and ridgeline horizon.
+   * Expanded spread ensures traces are prominently visible above and below dial.
+   * Ambient analog phosphor ripple guarantees living movement even during quiet passages in sleep mood.
    */
-  drawWaveformTraces(state, smSnapshot, rms) {
+  drawWaveformTraces(state, smSnapshot, rms, now = 0) {
     const centerY = this.height / 2;
     const isBuffering = state === AUDIO_STATES.BUFFERING;
     const isUnknown = state === AUDIO_STATES.UNKNOWN;
@@ -433,26 +440,26 @@ export class BackgroundWaveform {
     const isPreparing = state === AUDIO_STATES.PREPARING;
 
     // Amplitude scale by mood
-    let ampScale = 70;
-    if (this.mood === 'sleep') ampScale = 35;
-    if (this.mood === 'jog') ampScale = 65;
-    if (this.mood === 'zoomies') ampScale = 100;
-    if (isBuffering || isUnknown) ampScale = 25;
+    let ampScale = 75;
+    if (this.mood === 'sleep') ampScale = 45;
+    if (this.mood === 'jog') ampScale = 70;
+    if (this.mood === 'zoomies') ampScale = 110;
+    if (isBuffering || isUnknown) ampScale = 30;
 
-    // 1. Draw Older History Frames (Ridgeline above & below in Phosphor Data Blue / Amber)
-    if (!this.isOverlay && !isIdle && !isError) {
-      const offsets = [-70, -35, 35, 70];
-      const opacities = [0.06, 0.12, 0.12, 0.06];
+    // 1. Draw 4 History Frames (Ridgeline above & below in Phosphor Data Blue / Amber)
+    // Expanded offsets [-130, -65, 65, 130] place top traces above dial and bottom traces below dial
+    if (!this.isOverlay && !isError) {
+      const offsets = [-130, -65, 65, 130];
+      const opacities = [0.22, 0.38, 0.38, 0.22];
 
       for (let h = 0; h < this.numHistoryFrames; h++) {
         const bufIndex = (this.historyWriteIndex - 1 - h + this.numHistoryFrames) % this.numHistoryFrames;
         const buf = this.historyBuffers[bufIndex];
         const offsetY = offsets[h] || 0;
-        const alpha = isBuffering ? opacities[h] * 0.5 : opacities[h];
+        const alpha = isBuffering ? opacities[h] * 0.6 : (isIdle ? opacities[h] * 0.7 : opacities[h]);
 
         this.ctx.save();
         this.ctx.beginPath();
-        // Use Phosphor Data Blue for history frames (or amber in zoomies)
         if (this.mood === 'zoomies') {
           this.ctx.strokeStyle = `rgba(255, 178, 62, ${alpha.toFixed(3)})`;
         } else {
@@ -463,7 +470,7 @@ export class BackgroundWaveform {
           this.ctx.setLineDash([4, 6]);
         }
 
-        this.drawWavePath(buf, centerY + offsetY, ampScale * 0.7);
+        this.drawWavePath(buf, centerY + offsetY, ampScale * 0.7, false, h + 1, now);
         this.ctx.stroke();
         this.ctx.restore();
       }
@@ -474,45 +481,43 @@ export class BackgroundWaveform {
     this.ctx.beginPath();
 
     if (isIdle) {
-      // Idle: Flat center line with faint phosphor blue and amber dot
-      this.ctx.strokeStyle = 'rgba(91, 140, 255, 0.22)';
-      this.ctx.lineWidth = 1;
-      this.ctx.moveTo(0, centerY);
-      this.ctx.lineTo(this.width, centerY);
+      // Standby Sweep: Oscilloscope phosphor baseline across width with living analog drift
+      this.ctx.strokeStyle = 'rgba(91, 140, 255, 0.55)';
+      this.ctx.lineWidth = 1.4;
+      this.drawWavePath(this.timeDomainBuffer, centerY, ampScale * 0.5, true, 0, now);
       this.ctx.stroke();
 
       // Amber dot resting at left
-      this.ctx.fillStyle = 'rgba(255, 178, 62, 0.85)';
+      this.ctx.fillStyle = 'rgba(255, 178, 62, 0.95)';
       this.ctx.fillRect(20, centerY - 2, 4, 4);
     } else if (isPreparing) {
-      // Preparing: Dashed flat line with traveling amber dash
-      this.ctx.strokeStyle = 'rgba(91, 140, 255, 0.20)';
-      this.ctx.lineWidth = 1;
+      // Preparing: Dashed line with traveling amber dash
+      this.ctx.strokeStyle = 'rgba(91, 140, 255, 0.40)';
+      this.ctx.lineWidth = 1.2;
       this.ctx.setLineDash([8, 8]);
       this.ctx.lineDashOffset = -this.preparingDashOffset;
-      this.ctx.moveTo(0, centerY);
-      this.ctx.lineTo(this.width, centerY);
+      this.drawWavePath(this.timeDomainBuffer, centerY, ampScale * 0.5, true, 0, now);
       this.ctx.stroke();
 
       // Traveling amber pulse
       const pulseX = (this.preparingDashOffset * 25) % this.width;
-      this.ctx.strokeStyle = 'rgba(255, 178, 62, 0.9)';
+      this.ctx.strokeStyle = 'rgba(255, 178, 62, 0.95)';
       this.ctx.lineWidth = 2;
       this.ctx.setLineDash([]);
       this.ctx.beginPath();
       this.ctx.moveTo(pulseX, centerY);
-      this.ctx.lineTo(pulseX + 40, centerY);
+      this.ctx.lineTo(pulseX + 45, centerY);
       this.ctx.stroke();
     } else if (isError) {
       // Error: Flat line with cross-hatch marker
-      this.ctx.strokeStyle = 'rgba(255, 90, 90, 0.35)';
+      this.ctx.strokeStyle = 'rgba(255, 90, 90, 0.45)';
       this.ctx.lineWidth = 1;
       this.ctx.moveTo(0, centerY);
       this.ctx.lineTo(this.width, centerY);
       this.ctx.stroke();
 
-      // Cross-hatch red/bone marker at center
-      this.ctx.strokeStyle = 'rgba(255, 110, 110, 0.85)';
+      // Cross-hatch red marker at center
+      this.ctx.strokeStyle = 'rgba(255, 110, 110, 0.9)';
       this.ctx.lineWidth = 1.5;
       this.ctx.beginPath();
       this.ctx.moveTo(this.width / 2 - 10, centerY - 10);
@@ -522,25 +527,25 @@ export class BackgroundWaveform {
       this.ctx.stroke();
     } else {
       // Live Master Trace in Oscilloscope Phosphor
-      let traceColor = 'rgba(91, 140, 255, 0.65)';
+      let traceColor = 'rgba(91, 140, 255, 0.85)';
       if (this.mood === 'zoomies') {
-        traceColor = isBuffering ? 'rgba(255, 178, 62, 0.50)' : 'rgba(255, 178, 62, 0.72)';
+        traceColor = isBuffering ? 'rgba(255, 178, 62, 0.65)' : 'rgba(255, 178, 62, 0.92)';
       } else if (this.mood === 'jog') {
-        traceColor = isBuffering ? 'rgba(91, 140, 255, 0.45)' : 'rgba(91, 140, 255, 0.65)';
+        traceColor = isBuffering ? 'rgba(91, 140, 255, 0.60)' : 'rgba(91, 140, 255, 0.88)';
       } else if (this.mood === 'sleep') {
-        traceColor = isBuffering ? 'rgba(77, 162, 255, 0.35)' : 'rgba(77, 162, 255, 0.52)';
+        traceColor = isBuffering ? 'rgba(91, 140, 255, 0.50)' : 'rgba(91, 140, 255, 0.78)';
       } else if (isUnknown) {
-        traceColor = 'rgba(148, 163, 184, 0.38)';
+        traceColor = 'rgba(148, 163, 184, 0.55)';
       }
 
       this.ctx.strokeStyle = traceColor;
-      this.ctx.lineWidth = 1.2;
+      this.ctx.lineWidth = 1.5;
 
       if (isUnknown || isBuffering) {
         this.ctx.setLineDash([6, 6]);
       }
 
-      this.drawWavePath(this.timeDomainBuffer, centerY, ampScale);
+      this.drawWavePath(this.timeDomainBuffer, centerY, ampScale, true, 0, now);
       this.ctx.stroke();
     }
 
@@ -549,15 +554,24 @@ export class BackgroundWaveform {
 
   /**
    * Helper to draw continuous waveform path across canvas width.
+   * Multi-frequency analog phosphor sweep ensures trace ripples naturally even during quiet ambient periods.
    */
-  drawWavePath(buffer, baseY, amplitude) {
+  drawWavePath(buffer, baseY, amplitude, isLive = false, frameIndex = 0, now = 0) {
     const len = buffer.length;
     const stepX = this.width / (len - 1);
+    const timeSec = (now || performance.now()) * 0.001;
+    const phaseOffset = frameIndex * 0.85;
 
     for (let i = 0; i < len; i++) {
       const val = buffer[i] || 0;
       const x = i * stepX;
-      const y = baseY + val * amplitude;
+
+      // Multi-harmonic idle phosphor drift: keeps traces alive and breathing
+      const harmonic1 = Math.sin(timeSec * 1.8 + i * 0.045 + phaseOffset) * 4.5;
+      const harmonic2 = Math.sin(timeSec * 0.75 + i * 0.018 + phaseOffset * 1.5) * 3.0;
+      const idleRipple = harmonic1 + harmonic2;
+
+      const y = baseY + val * amplitude + idleRipple;
 
       if (i === 0) {
         this.ctx.moveTo(x, y);
@@ -568,38 +582,69 @@ export class BackgroundWaveform {
   }
 
   /**
-   * Render state-specific readouts and error controls.
+   * Render state-specific readouts and honest buffering badge.
+   * Rendered in the clear unobstructed space above the dial rim so it is never hidden behind dial elements.
    */
-  drawStateOverlay(smSnapshot) {
+  drawStateOverlay(smSnapshot, now = 0) {
     if (this.isOverlay) return;
 
     const state = smSnapshot.targetState || smSnapshot.state;
     const cause = smSnapshot.cause;
     const centerY = this.height / 2;
 
+    // Position overlay badge in open zone above central dial rim
+    const badgeY = Math.max(90, centerY - 285);
+    const centerX = this.width / 2;
+
     this.ctx.save();
-    this.ctx.font = '11px "JetBrains Mono", monospace';
     this.ctx.textAlign = 'center';
     this.ctx.textBaseline = 'middle';
 
+    const drawPillBadge = (text, textColor, borderColor, bgColor, pulseDot = false) => {
+      this.ctx.font = '10px "JetBrains Mono", monospace';
+      const textWidth = this.ctx.measureText(text).width;
+      const pillWidth = textWidth + (pulseDot ? 36 : 24);
+      const pillHeight = 22;
+      const left = centerX - pillWidth / 2;
+      const top = badgeY - pillHeight / 2;
+
+      // Pill Backdrop
+      this.ctx.fillStyle = bgColor;
+      this.ctx.fillRect(left, top, pillWidth, pillHeight);
+
+      // Pill Hairline Border
+      this.ctx.strokeStyle = borderColor;
+      this.ctx.lineWidth = 1;
+      this.ctx.strokeRect(left, top, pillWidth, pillHeight);
+
+      // Pulsing dot if active
+      if (pulseDot) {
+        const timeSec = (now || performance.now()) * 0.001;
+        const pulse = 0.5 + Math.sin(timeSec * 6) * 0.5;
+        this.ctx.fillStyle = `rgba(255, 178, 62, ${0.4 + pulse * 0.6})`;
+        this.ctx.beginPath();
+        this.ctx.arc(left + 12, badgeY, 3, 0, Math.PI * 2);
+        this.ctx.fill();
+        this.ctx.fillStyle = textColor;
+        this.ctx.fillText(text, centerX + 6, badgeY);
+      } else {
+        this.ctx.fillStyle = textColor;
+        this.ctx.fillText(text, centerX, badgeY);
+      }
+    };
+
     if (state === AUDIO_STATES.IDLE) {
-      this.ctx.fillStyle = 'rgba(233, 230, 220, 0.35)';
-      this.ctx.fillText('PRESS TUNE IN', this.width / 2, centerY - 20);
+      drawPillBadge('STANDBY · PRESS TUNE IN', 'rgba(233, 230, 220, 0.65)', 'rgba(91, 140, 255, 0.35)', 'rgba(11, 11, 15, 0.85)');
     } else if (state === AUDIO_STATES.PREPARING) {
-      this.ctx.fillStyle = 'rgba(255, 178, 62, 0.65)';
-      this.ctx.fillText('PREPARING AUDIO GRAPH...', this.width / 2, centerY - 20);
+      drawPillBadge('PREPARING AUDIO GRAPH...', 'rgba(255, 178, 62, 0.95)', 'rgba(255, 178, 62, 0.75)', 'rgba(18, 14, 10, 0.92)', true);
     } else if (state === AUDIO_STATES.BUFFERING) {
-      this.ctx.fillStyle = 'rgba(255, 178, 62, 0.85)';
       const causeText = cause ? `BUFFERING: ${cause.toUpperCase()}` : 'BUFFERING AUDIO...';
-      this.ctx.fillText(causeText, this.width / 2, centerY - 25);
+      drawPillBadge(causeText, 'rgba(255, 178, 62, 0.98)', 'rgba(255, 178, 62, 0.95)', 'rgba(22, 16, 8, 0.94)', true);
     } else if (state === AUDIO_STATES.UNKNOWN) {
-      this.ctx.fillStyle = 'rgba(233, 230, 220, 0.4)';
-      this.ctx.fillText('SIGNAL UNKNOWN // HOLDING TELEMETRY', this.width / 2, centerY - 25);
+      drawPillBadge('SIGNAL UNKNOWN // HOLDING TELEMETRY', 'rgba(233, 230, 220, 0.65)', 'rgba(148, 163, 184, 0.5)', 'rgba(15, 15, 20, 0.90)');
     } else if (state === AUDIO_STATES.ERROR) {
-      this.ctx.fillStyle = 'rgba(233, 230, 220, 0.75)';
       const msg = cause ? `ERROR: ${cause.toUpperCase()}` : 'STATION PLAYBACK ERROR';
-      this.ctx.fillText(msg, this.width / 2, centerY - 30);
-      this.ctx.fillText('[ PRESS RETRY IN CONTROLS ]', this.width / 2, centerY + 25);
+      drawPillBadge(msg, 'rgba(255, 110, 110, 0.95)', 'rgba(255, 90, 90, 0.85)', 'rgba(30, 10, 10, 0.95)');
     }
 
     this.ctx.restore();
