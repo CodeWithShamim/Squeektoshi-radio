@@ -4,6 +4,8 @@
 
 # Squeektoshi-radio 🐹📻
 
+squeekchain-project: 89cc8877-4a58-4b68-ac34-7b5d6e7149a3
+
 > **Hamster-Powered Generative Music Station on Squeekchain PoW Telemetry**  
 > Built for the Squeekchain *Genesis Code Lane* builder campaign.
 
