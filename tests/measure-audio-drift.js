@@ -11,8 +11,14 @@ async function measureAudioSchedulerDrift() {
   await page.goto('http://localhost:3000/app.html?demo');
   await page.waitForTimeout(1000);
 
-  // Click Tune In
-  await page.locator('#tune-btn').click();
+  // Ensure Tuned In
+  const isAlreadyTuned = await page.evaluate(async () => {
+    const { state } = await import('/src/main.js');
+    return state.isTunedIn;
+  });
+  if (!isAlreadyTuned) {
+    await page.locator('#tune-btn').click();
+  }
   await page.waitForTimeout(500);
 
   // Inject scheduler instrumentor and frame-time recorder

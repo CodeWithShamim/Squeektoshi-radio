@@ -28,6 +28,9 @@ import { BandRingManager } from './ui/band-ring.js';
 import { ReplayPlayer, composeDayPlan } from './music/replay.js';
 import { buildBandVoices } from './music/band.js';
 import { createSqueekCard, createCardSkeleton, pulseCardActivity } from './ui/cards.js';
+import { AudioStateMachine, AUDIO_STATES } from './ui/audio-state.js';
+import { BackgroundWaveform } from './ui/waveform.js';
+import { CueManager } from './audio/cues.js';
 
 let visualizer = null;
 let centralDial = null;
@@ -39,6 +42,9 @@ let bandGenerationId = 0;
 let mediaRecorder = null;
 let recordedAudioChunks = [];
 let recordTimerInterval = null;
+let audioStateMachine = null;
+let bgWaveform = null;
+let cueManager = null;
 
 // Application State
 export const state = {
@@ -124,8 +130,28 @@ export function updateUI(statusData) {
   // Detect block height completion
   if (state.lastBlockHeight !== null && statusData.blockHeight > state.lastBlockHeight) {
     if (motionSystem) motionSystem.runBlockComplete();
+    if (cueManager) {
+      const { rootMidi } = keyInfo;
+      const fifthMidi = rootMidi + 7;
+      const midiToFreq = (m) => 440 * Math.pow(2, (m - 69) / 12);
+      cueManager.playBlock(midiToFreq(rootMidi), midiToFreq(fifthMidi));
+    }
   }
   state.lastBlockHeight = statusData.blockHeight;
+
+  // Update background waveform
+  if (bgWaveform) {
+    bgWaveform.updateTelemetry(statusData, bpm, mood);
+  }
+
+  // Update audio state machine on signal changes
+  if (!statusData.isAvailable || statusData.freshness === 'unavailable') {
+    if (audioStateMachine) {
+      audioStateMachine.setState(AUDIO_STATES.UNKNOWN, 'Signal unavailable');
+    }
+  } else if (state.isTunedIn && audioStateMachine?.currentState === AUDIO_STATES.UNKNOWN) {
+    audioStateMachine.setState(AUDIO_STATES.PLAYING);
+  }
 
   // 1. Update Readouts Coordinator
   if (readoutsManager) {
@@ -200,6 +226,9 @@ export function updateUI(statusData) {
   if (visualizer) {
     visualizer.setRpm(statusData.rpm);
   }
+
+  // 7. Manage Demo Try highlight button visibility
+  updateDemoTryButtons(mood);
 }
 
 /**
@@ -318,6 +347,9 @@ async function pollSettlements() {
       // Detect settlement count increase -> chime and log row
       if (state.lastSettlementCount !== null && parsed.settlementCount > state.lastSettlementCount) {
         audioEngine.ringSettlementChime();
+        if (cueManager) {
+          cueManager.playSettle();
+        }
         if (centralDial) centralDial.triggerChimePulse();
 
         const latest = parsed.recentSettlements?.[0];
@@ -440,6 +472,10 @@ export async function loadBandTokens(tokens) {
   const container = document.getElementById('band-cards-grid');
   const msgEl = document.getElementById('band-status-msg');
 
+  if (bgWaveform) {
+    bgWaveform.setBandActive(Boolean(tokens && tokens.length > 0));
+  }
+
   if (tokens?.isUnavailable) {
     if (msgEl) {
       msgEl.textContent = 'Signal unknown. Preserving last known band.';
@@ -453,6 +489,13 @@ export async function loadBandTokens(tokens) {
 
     if (bandRing) {
       bandRing.setTokens(tokens);
+    }
+
+    // Play seat sound cue for loaded Squeeks (CueManager rate limits to <= 8/sec)
+    if (cueManager) {
+      tokens.forEach((t) => {
+        cueManager.playSeat(t.tokenId, t.level);
+      });
     }
 
     if (container) {
@@ -553,11 +596,17 @@ function setupBandControls() {
           onProgress: (loaded, total) => {
             if (currentGen === bandGenerationId && msgEl) {
               msgEl.textContent = `Fetching Squeeks... (${loaded} of ${total})`;
+              if (audioStateMachine) {
+                audioStateMachine.setState(AUDIO_STATES.BUFFERING, `Loading Squeeks ${loaded} of ${total}`);
+              }
             }
           },
           onRateLimit: (statusText) => {
             if (currentGen === bandGenerationId && msgEl) {
               msgEl.textContent = statusText;
+              if (audioStateMachine) {
+                audioStateMachine.setState(AUDIO_STATES.BUFFERING, 'Waiting for the API rate limit');
+              }
             }
           },
         });
@@ -566,10 +615,16 @@ function setupBandControls() {
         if (currentGen !== bandGenerationId) return;
 
         await loadBandTokens(tokens);
+        if (state.isTunedIn && audioStateMachine) {
+          audioStateMachine.setState(AUDIO_STATES.PLAYING);
+        }
       } catch (err) {
         if (currentGen === bandGenerationId && msgEl) {
           msgEl.textContent = 'Could not reach Squeekchain API. Check address or try again.';
           msgEl.style.color = 'var(--color-amber)';
+        }
+        if (audioStateMachine && state.isTunedIn) {
+          audioStateMachine.setState(AUDIO_STATES.PLAYING);
         }
       } finally {
         if (currentGen === bandGenerationId) {
@@ -613,11 +668,132 @@ export function updateShareUrl() {
 }
 
 /**
+ * Manages visibility of the highlight 'Demo Try' button(s) and 'Live' button(s).
+ * - When in Demo mode (state.isDemo === true):
+ *   'Live' buttons are shown, 'Demo Try' buttons are hidden.
+ * - When in Live mode (state.isDemo === false):
+ *   'Live' buttons are hidden.
+ *   'Demo Try' buttons are shown IF mood is 'sleep', otherwise hidden.
+ * @param {string} mood
+ */
+export function updateDemoAndLiveButtons(mood) {
+  const isDemo = Boolean(state.isDemo);
+  const isSleep = (mood === 'sleep') && !isDemo;
+
+  const demoButtons = document.querySelectorAll('.btn-demo-try');
+  demoButtons.forEach((btn) => {
+    btn.style.display = isSleep ? 'inline-flex' : 'none';
+  });
+
+  const liveButtons = document.querySelectorAll('.btn-live-switch, .btn-header-live, #tab-live');
+  liveButtons.forEach((btn) => {
+    btn.style.display = isDemo ? 'inline-flex' : 'none';
+  });
+}
+
+// Backwards compatibility alias
+export const updateDemoTryButtons = updateDemoAndLiveButtons;
+
+/**
+ * Triggers interactive Demo Mode on user request.
+ * Transitions from sleep to live running demo so user immediately hears audio & sees the wheel turn.
+ */
+export function activateDemoTry() {
+  state.isDemo = true;
+  // Start at 20s in the demo cycle (jogging mood) so the hamster immediately runs and generative music plays
+  state.demoStartTime = Date.now() - 20000;
+
+  if (elements.demoBadge) {
+    elements.demoBadge.style.display = 'inline-flex';
+  }
+
+  // Update button visibility immediately (shows Live button, hides Demo Try)
+  updateDemoAndLiveButtons('jog');
+
+  // Update URL to include ?demo cleanly without refreshing
+  try {
+    const url = new URL(window.location.href);
+    url.searchParams.set('demo', '1');
+    window.history.replaceState({}, '', url);
+  } catch {}
+
+  // Tune in if not already active
+  if (!state.isTunedIn) {
+    tuneIn(true);
+  } else if (state.isMuted) {
+    state.isMuted = false;
+    audioEngine.setMute(false);
+    if (elements.muteBtn) {
+      elements.muteBtn.textContent = 'MUTE';
+      elements.muteBtn.style.color = 'var(--color-bone-muted)';
+    }
+  }
+
+  // Pre-populate demo band tokens if empty
+  const bandGrid = document.getElementById('band-cards-grid');
+  if (bandGrid && !bandGrid.children.length) {
+    loadBandTokens(getDemoBandTokens());
+  }
+
+  // Immediately poll status to update state & UI
+  pollStatus();
+}
+
+/**
+ * Switches station from Demo mode back to live telemetry.
+ */
+export async function activateLiveMode() {
+  state.isDemo = false;
+
+  // Remove ?demo from URL
+  try {
+    const url = new URL(window.location.href);
+    url.searchParams.delete('demo');
+    window.history.replaceState({}, '', url);
+  } catch {}
+
+  // Hide DEMO badge
+  if (elements.demoBadge) {
+    elements.demoBadge.style.display = 'none';
+  }
+
+  // Update button visibility immediately
+  const curMood = state.status ? resolveMood(state.status) : 'sleep';
+  updateDemoAndLiveButtons(curMood);
+
+  // Immediately poll status from real API
+  await pollStatus();
+}
+
+/**
+ * Setup Demo Try and Live mode switch listeners.
+ */
+function setupDemoTryControls() {
+  const demoButtons = document.querySelectorAll('.btn-demo-try');
+  demoButtons.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      activateDemoTry();
+    });
+  });
+
+  const liveButtons = document.querySelectorAll('.btn-live-switch, .btn-header-live, #tab-live');
+  liveButtons.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      activateLiveMode();
+    });
+  });
+
+  const initialMood = state.status ? resolveMood(state.status) : 'sleep';
+  updateDemoAndLiveButtons(initialMood);
+}
+
+/**
  * Setup Professional Features Console Drawer.
  */
 function setupConsoleDrawer() {
   const drawer = document.getElementById('console-drawer');
   const openBtn = document.getElementById('btn-open-console');
+  const headerOpenBtn = document.getElementById('btn-header-console');
   const closeBtn = document.getElementById('console-close-btn');
 
   const toggleConsole = (forceOpen) => {
@@ -626,10 +802,12 @@ function setupConsoleDrawer() {
     drawer.classList.toggle('open', shouldOpen);
     drawer.setAttribute('aria-hidden', String(!shouldOpen));
     if (openBtn) openBtn.setAttribute('aria-expanded', String(shouldOpen));
+    if (headerOpenBtn) headerOpenBtn.setAttribute('aria-expanded', String(shouldOpen));
     if (shouldOpen) updateShareUrl();
   };
 
   if (openBtn) openBtn.addEventListener('click', () => toggleConsole());
+  if (headerOpenBtn) headerOpenBtn.addEventListener('click', () => toggleConsole());
   if (closeBtn) closeBtn.addEventListener('click', () => toggleConsole(false));
 
   // Mode Segmented Control
@@ -654,6 +832,10 @@ function setupConsoleDrawer() {
       const mode = btn.dataset.mode;
       state.activeMode = mode;
       audioEngine.setMode(mode);
+
+      if (mode === 'live' && state.isDemo) {
+        activateLiveMode();
+      }
 
       if (descEl) descEl.textContent = descMap[mode] || '';
 
@@ -944,16 +1126,17 @@ let gestureAttached = false;
 function setupOneShotGestureTune() {
   if (gestureAttached) return;
   gestureAttached = true;
-  const onFirstInteraction = async () => {
+  const onFirstInteraction = async (e) => {
+    if (e?.target?.closest && e.target.closest('#tune-btn')) return;
     window.removeEventListener('pointerdown', onFirstInteraction);
     window.removeEventListener('keydown', onFirstInteraction);
     window.removeEventListener('touchstart', onFirstInteraction);
     gestureAttached = false;
     await tuneIn(true);
   };
-  window.addEventListener('pointerdown', onFirstInteraction, { once: true, passive: true });
-  window.addEventListener('keydown', onFirstInteraction, { once: true, passive: true });
-  window.addEventListener('touchstart', onFirstInteraction, { once: true, passive: true });
+  window.addEventListener('pointerdown', onFirstInteraction, { passive: true });
+  window.addEventListener('keydown', onFirstInteraction, { passive: true });
+  window.addEventListener('touchstart', onFirstInteraction, { passive: true });
 }
 
 /**
@@ -962,14 +1145,28 @@ function setupOneShotGestureTune() {
  */
 export async function tuneIn(fromGesture = false) {
   if (state.isTunedIn) return;
+  if (audioStateMachine) {
+    audioStateMachine.setState(AUDIO_STATES.PREPARING);
+  }
   try {
     await audioEngine.start();
     if (audioEngine.ctx && audioEngine.ctx.state === 'running') {
+      if (cueManager) {
+        cueManager.unlock();
+        cueManager.init(audioEngine.ctx);
+        cueManager.playIgnite();
+      }
+      if (bgWaveform && audioEngine.analyser) {
+        bgWaveform.setAnalyser(audioEngine.analyser);
+      }
       if (centralDial && audioEngine.analyser) {
         centralDial.setAnalyser(audioEngine.analyser);
       }
       if (motionSystem) {
         motionSystem.runIgnition();
+      }
+      if (audioStateMachine) {
+        audioStateMachine.setState(AUDIO_STATES.PLAYING);
       }
 
       state.isTunedIn = true;
@@ -982,6 +1179,9 @@ export async function tuneIn(fromGesture = false) {
       setupOneShotGestureTune();
     }
   } catch (err) {
+    if (audioStateMachine) {
+      audioStateMachine.setState(AUDIO_STATES.ERROR, err?.message || 'Audio playback failed');
+    }
     if (!fromGesture) {
       setupOneShotGestureTune();
     }
@@ -995,6 +1195,9 @@ export async function toggleAudio() {
   if (state.isTunedIn) {
     audioEngine.stop();
     state.isTunedIn = false;
+    if (audioStateMachine) {
+      audioStateMachine.setState(AUDIO_STATES.IDLE);
+    }
     if (elements.tuneBtn) {
       elements.tuneBtn.classList.remove('active-tune', 'playing');
       elements.tuneBtn.setAttribute('aria-pressed', 'false');
@@ -1002,6 +1205,68 @@ export async function toggleAudio() {
     if (elements.tuneText) elements.tuneText.textContent = 'Tune in';
   } else {
     await tuneIn(true);
+  }
+}
+
+let lastVuRms = 0;
+let vuPipsCache = null;
+
+export function updateVolumeDisplay(vol, isMuted) {
+  const el = document.getElementById('val-vol-db');
+  if (!el) return;
+  if (isMuted || vol <= 0.01) {
+    el.textContent = '-∞ dB';
+  } else {
+    const db = 20 * Math.log10(vol);
+    el.textContent = `${db.toFixed(1)} dB`;
+  }
+}
+
+export function updateVuMeter() {
+  const vuTrack = document.getElementById('vu-track-l');
+  const vuPeakVal = document.getElementById('vu-peak-val');
+  if (!vuTrack) return;
+
+  if (!vuPipsCache) {
+    vuPipsCache = vuTrack.querySelectorAll('.vu-pip');
+  }
+
+  let rms = 0;
+  if (audioEngine?.analyser && state.isTunedIn && !state.isMuted) {
+    const data = audioEngine.getTimeDomainData();
+    let sum = 0;
+    for (let i = 0; i < data.length; i++) {
+      const v = (data[i] - 128) / 128;
+      sum += v * v;
+    }
+    rms = Math.sqrt(sum / data.length);
+  }
+
+  // Smooth attack / gradual decay
+  if (rms > lastVuRms) {
+    lastVuRms = rms;
+  } else {
+    lastVuRms = Math.max(0, lastVuRms - 0.015);
+  }
+
+  const numPips = vuPipsCache.length;
+  const activeCount = Math.min(numPips, Math.round((lastVuRms / 0.22) * numPips));
+
+  for (let i = 0; i < numPips; i++) {
+    if (i < activeCount) {
+      vuPipsCache[i].classList.add('lit');
+    } else {
+      vuPipsCache[i].classList.remove('lit');
+    }
+  }
+
+  if (vuPeakVal) {
+    if (!state.isTunedIn || state.isMuted || lastVuRms <= 0.005) {
+      vuPeakVal.textContent = '-∞ dB';
+    } else {
+      const db = 20 * Math.log10(lastVuRms * 3.5);
+      vuPeakVal.textContent = `${Math.min(0, Math.max(-48, db)).toFixed(1)} dB`;
+    }
   }
 }
 
@@ -1045,6 +1310,70 @@ export function init() {
         diagNote.textContent = `Audio is struggling (${lateness.toFixed(0)}ms lateness) — reducing voice density`;
       }
     }
+    if (struggling) {
+      if (audioStateMachine) {
+        audioStateMachine.setState(AUDIO_STATES.BUFFERING, 'Audio is struggling');
+      }
+      if (cueManager) {
+        cueManager.playWarn();
+      }
+    } else {
+      if (audioStateMachine) {
+        audioStateMachine.setState(AUDIO_STATES.PLAYING);
+      }
+      if (cueManager) {
+        cueManager.playReady();
+      }
+    }
+  };
+
+  // Sound-effect Cues Coordinator
+  cueManager = new CueManager({
+    isOverlay: state.isOverlay,
+    allowOverlayCues: urlParams.get('cues') === '1',
+  });
+
+  const cueToggleBtn = document.getElementById('btn-toggle-cues');
+  if (cueToggleBtn) {
+    const updateCueBtn = (enabled) => {
+      cueToggleBtn.setAttribute('aria-pressed', String(enabled));
+      cueToggleBtn.textContent = enabled ? 'CUES ON' : 'CUES OFF';
+      cueToggleBtn.style.color = enabled ? 'var(--color-amber)' : 'var(--color-bone-muted)';
+      cueToggleBtn.style.borderColor = enabled ? 'var(--color-amber)' : 'var(--color-hairline)';
+    };
+    updateCueBtn(cueManager.isEnabled());
+    cueToggleBtn.addEventListener('click', () => {
+      cueManager.unlock();
+      const newState = cueManager.toggle();
+      updateCueBtn(newState);
+    });
+  }
+
+  // Audio State Machine
+  const announcerEl = document.getElementById('audio-state-announcer');
+  audioStateMachine = new AudioStateMachine({
+    initialState: AUDIO_STATES.IDLE,
+    ariaLiveElement: announcerEl,
+    onRetry: () => {
+      tuneIn(true);
+    },
+  });
+
+  // Background Oscilloscope Waveform Renderer
+  const bgCanvas = document.getElementById('bg-waveform-canvas');
+  if (bgCanvas) {
+    bgWaveform = new BackgroundWaveform({
+      canvas: bgCanvas,
+      stateMachine: audioStateMachine,
+      isOverlay: state.isOverlay,
+    });
+  }
+
+  // Forward Voice Activity from audio engine to waveform
+  audioEngine.onVoiceTriggered = (layer, intensity) => {
+    if (bgWaveform) {
+      bgWaveform.pulseLayer(layer, intensity);
+    }
   };
 
   // Instantiate Presentation Layer
@@ -1057,9 +1386,21 @@ export function init() {
   if (dialSvg) {
     centralDial = new CentralDial({
       onHourSelect: (h) => {
+        if (audioStateMachine) {
+          audioStateMachine.setState(AUDIO_STATES.BUFFERING, 'Loading replay data');
+          setTimeout(() => {
+            if (state.isTunedIn) audioStateMachine.setState(AUDIO_STATES.PLAYING);
+          }, 350);
+        }
         if (replayPlayer) {
           replayPlayer.seek(h);
         }
+      },
+      onRenderFrame: (delta, now) => {
+        if (bgWaveform) {
+          bgWaveform.render(delta, now);
+        }
+        updateVuMeter();
       },
     });
   }
@@ -1089,10 +1430,12 @@ export function init() {
   tuneIn();
 
   if (elements.volumeSlider) {
+    updateVolumeDisplay(state.volume, state.isMuted);
     elements.volumeSlider.addEventListener('input', (e) => {
       const vol = parseFloat(e.target.value);
       state.volume = vol;
       audioEngine.setVolume(vol);
+      updateVolumeDisplay(vol, state.isMuted);
     });
   }
 
@@ -1102,6 +1445,7 @@ export function init() {
       audioEngine.setMute(state.isMuted);
       elements.muteBtn.textContent = state.isMuted ? 'UNMUTE' : 'MUTE';
       elements.muteBtn.style.color = state.isMuted ? 'var(--color-amber)' : 'var(--color-bone-muted)';
+      updateVolumeDisplay(state.volume, state.isMuted);
     });
   }
 
@@ -1143,6 +1487,10 @@ export function init() {
       if (consoleDrawer) {
         consoleDrawer.classList.remove('open');
         consoleDrawer.setAttribute('aria-hidden', 'true');
+        const openBtn = document.getElementById('btn-open-console');
+        const headerOpenBtn = document.getElementById('btn-header-console');
+        if (openBtn) openBtn.setAttribute('aria-expanded', 'false');
+        if (headerOpenBtn) headerOpenBtn.setAttribute('aria-expanded', 'false');
       }
       if (diagPanel) {
         diagPanel.classList.remove('open');
@@ -1153,6 +1501,7 @@ export function init() {
 
   // Setup Feature Modules
   setupConsoleDrawer();
+  setupDemoTryControls();
   setupDiagnosticsPanel();
   setupExportClip();
   setupOverlayVariants();

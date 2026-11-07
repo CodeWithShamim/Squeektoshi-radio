@@ -43,7 +43,34 @@ Squeektoshi Radio turns the live WHEELY9000 hamster wheel into a continuous, gen
    - Live visual card glow pulsing in real-time as each Squeek voice triggers.
    - Includes a **Demo Band** button for empty wallets or offline exploration.
 
-5. **OBS / Stream Overlay Mode (Feature 4)**
+5. **Background Waveform Visualisation (Full-Bleed Oscilloscope)**
+   - The station acts as a precision measuring instrument: a full-bleed background canvas draws the master output as a 5-line ridgeline horizon (~2 seconds history).
+   - 7 vertical audio lanes on the left edge (`KICK`, `BASS`, `LEAD`, `PAD`, `HARMONY`, `BELL`, and `BAND` when wallet is loaded) with real-time level ticks.
+   - Traveling amber beat marker line and data-blue block progress threshold line.
+   - Mood-reactive drift speed and waveform spacing (`sleep`, `jog`, `zoomies`, `unknown`).
+   - Adaptive performance governor: DPR capped at 1.5, automatically downgrades if frame time exceeds 20ms, pauses when tab is hidden, uses pre-allocated `Float32Array` buffers (zero per-frame allocations).
+   - Overlay mode (`?overlay=1`): single faint trace with transparent background.
+
+6. **Honest Buffering State Machine**
+   - Transparent, signal-driven station coordination across 6 explicit states: `idle`, `preparing`, `buffering`, `playing`, `unknown`, `error`.
+   - 300ms debounce prevents visual flicker from transient network or audio scheduler jitter.
+   - 0.6s smooth, reversible transition interpolation.
+   - Honest, truthful cause readouts: *"Audio is struggling"*, *"Loading replay data"*, *"Loading Squeeks n of N"*, *"Waiting for the API rate limit"*.
+   - Direct `aria-live="polite"` announcements for screen readers and assistive technology.
+
+7. **Synthesized Sound-Effect Cues**
+   - Delicate, purely synthesized UI audio cues using the Web Audio API (no external audio files):
+     - `ignite`: quiet rising tick micro-sequence over 0.6s on Tune in.
+     - `block`: soft two-note harmonic chime on block completion, tuned to key & scale.
+     - `settle`: single dry high bell tap on settlement confirmation.
+     - `ready`: single crisp high tick when buffering resolves.
+     - `warn`: low double tick when buffering begins.
+     - `seat`: micro-pluck panned by `(tokenId % 16)`, rate-limited to $\le 8/\text{sec}$.
+   - Dedicated $-12\text{ dB}$ cue bus through a dynamics compressor limiter to prevent clashing.
+   - Separate `CUES ON / OFF` toggle in station header, persisted in `localStorage`.
+   - Muted by default in stream overlay mode unless explicitly enabled with `?cues=1`.
+
+8. **OBS / Stream Overlay Mode (Feature 4)**
    - `?overlay=1`: Transparent background, removes station controls, renders an isolated now-playing ticker (mood badge, tempo, block, progress) and the rotating WHEELY9000 visualizer.
    - `?overlay=1&chroma=1`: Replaces transparency with `#00ff00` green for legacy chroma keying.
 
@@ -133,7 +160,7 @@ Open your browser to:
 The test suite includes pure mapping tests, replay determinism tests, API parsing tests, automated WCAG accessibility audits, audio scheduler drift measurements, and Playwright end-to-end tests:
 
 ```bash
-# Run all unit tests (Node.js native test runner - 25 tests)
+# Run all unit tests (Node.js native test runner - 37 tests)
 npm test
 
 # Run Playwright end-to-end tests (mocked & live routes - 13 tests)

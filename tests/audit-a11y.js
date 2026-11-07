@@ -34,7 +34,8 @@ async function runAccessibilityAudit() {
     await checkPage('Landing Page (index.html)');
 
     // 2. App Console Default
-    await page.goto('http://localhost:3000/app.html', { waitUntil: 'networkidle' });
+    await page.goto('http://localhost:3000/app.html', { waitUntil: 'load' });
+    await page.waitForTimeout(500);
     await checkPage('Station Console (app.html default)');
 
     // 3. App Console with Professional Features Drawer Open

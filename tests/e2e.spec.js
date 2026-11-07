@@ -258,5 +258,100 @@ test.describe('Squeektoshi Radio - End-to-End Test Suite', () => {
     const cards = page.locator('.squeek-card');
     await expect(cards).toHaveCount(6);
   });
+
+  test('header right contains Console button that opens console drawer', async ({ page }) => {
+    await page.goto('/app.html');
+    const headerConsoleBtn = page.locator('#btn-header-console');
+    await expect(headerConsoleBtn).toBeVisible();
+    await expect(headerConsoleBtn).toHaveText('Console');
+    await expect(headerConsoleBtn).toHaveAttribute('aria-expanded', 'false');
+
+    // Clicking header console button opens drawer
+    await headerConsoleBtn.click();
+    const drawer = page.locator('#console-drawer');
+    await expect(drawer).toHaveClass(/open/);
+    await expect(headerConsoleBtn).toHaveAttribute('aria-expanded', 'true');
+
+    // Close via close button
+    const closeBtn = page.locator('#console-close-btn');
+    await closeBtn.click();
+    await expect(drawer).not.toHaveClass(/open/);
+    await expect(headerConsoleBtn).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  test('Demo Try highlight button appears when mood is sleep and activates demo mode on click', async ({ page }) => {
+    let mockRpm = 0;
+    let mockCoreStatus = 'IDLE';
+
+    await page.route('**/v1/status', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          schemaVersion: 1,
+          measurement: {
+            freshness: 'online',
+            coreStatus: mockCoreStatus,
+            rpmMilli: mockRpm * 1000,
+          },
+          builder: {
+            status: 'available',
+            anchor: { blockHeight: '1200', blockProgress: '200000000' },
+          },
+        }),
+      });
+    });
+
+    await page.goto('/app.html');
+    await page.waitForTimeout(500);
+
+    // Initial state is sleep: both Demo Try buttons should be visible and highlighted
+    const moodBadge = page.locator('#badge-mood');
+    await expect(moodBadge).toHaveText('SLEEP');
+
+    const demoTryBtn = page.locator('#btn-demo-try');
+    await expect(demoTryBtn).toBeVisible();
+    await expect(demoTryBtn).toHaveText('Demo Try');
+    await expect(demoTryBtn).toHaveClass(/btn-console-highlight/);
+
+    const headerDemoBtn = page.locator('#btn-header-demo');
+    await expect(headerDemoBtn).toBeVisible();
+    await expect(headerDemoBtn).toHaveText('Demo Try');
+
+    // Clicking Demo Try triggers demo mode
+    await demoTryBtn.click();
+    await page.waitForTimeout(400);
+
+    // DEMO badge should now be shown
+    const demoBadge = page.locator('#demo-badge');
+    await expect(demoBadge).toBeVisible();
+
+    // Since demo mode jumped to 20s (jogging mood), mood is no longer sleep, and Demo Try buttons hide
+    await expect(demoTryBtn).toBeHidden();
+    await expect(headerDemoBtn).toBeHidden();
+
+    // Live buttons should now appear
+    const headerLiveBtn = page.locator('#btn-header-live');
+    const moodLiveBtn = page.locator('#btn-live-switch');
+    await expect(headerLiveBtn).toBeVisible();
+    await expect(headerLiveBtn).toHaveText('Live');
+    await expect(moodLiveBtn).toBeVisible();
+    await expect(moodLiveBtn).toHaveText('Live');
+
+    // Clicking Live button switches back to Live mode
+    await headerLiveBtn.click();
+    await page.waitForTimeout(400);
+
+    // DEMO badge should hide
+    await expect(demoBadge).toBeHidden();
+
+    // Live buttons should now be hidden
+    await expect(headerLiveBtn).toBeHidden();
+    await expect(moodLiveBtn).toBeHidden();
+
+    // Demo Try buttons should reappear since real telemetry is in sleep mood
+    await expect(demoTryBtn).toBeVisible();
+    await expect(headerDemoBtn).toBeVisible();
+  });
 });
 

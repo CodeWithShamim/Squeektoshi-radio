@@ -20,6 +20,12 @@
   <link rel="stylesheet" href="console.css">
 </head>
 <body class="app-body">
+  <!-- Full-bleed Background Oscilloscope Canvas -->
+  <canvas id="bg-waveform-canvas" class="bg-waveform-canvas" aria-hidden="true"></canvas>
+
+  <!-- Screen Reader Audio State Announcer -->
+  <div id="audio-state-announcer" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+
   <!-- Hairline 12-Column Grid Lines -->
   <div class="app-grid-lines" aria-hidden="true">
     <div class="app-grid-col"></div>
@@ -49,6 +55,10 @@
     </div>
 
     <div class="header-right">
+      <button id="btn-header-demo" class="btn-console-highlight btn-demo-try" aria-label="Demo Try" style="display: none;">Demo Try</button>
+      <button id="btn-header-live" class="btn-console-secondary btn-header-live" aria-label="Live" style="display: none;">Live</button>
+      <button id="btn-header-console" class="btn-console-secondary btn-header-console" aria-expanded="false" title="Open Console Settings (C)" aria-label="Console">Console</button>
+      <button id="btn-toggle-cues" class="btn-console-secondary btn-cue-toggle" aria-pressed="true" aria-label="CUES ON">CUES ON</button>
       <div id="signal-badge" class="header-signal" aria-live="polite">
         <span id="signal-dot" class="signal-indicator-dot live" aria-hidden="true"></span>
         <span id="signal-text">live</span>
@@ -67,11 +77,13 @@
   <main class="console-container" id="app-station">
     <!-- Left Rail (Cols 1 - 3): Typographic Readout Stack -->
     <section class="readouts-rail-left" aria-label="Audio and Wheel Telemetry">
-      <div class="readout-item">
+      <div class="readout-item readout-item-mood">
         <span class="readout-label">MOOD</span>
         <div class="mask-num-wrapper">
           <span id="badge-mood" class="readout-value mood-display sleep" aria-live="polite">sleep</span>
         </div>
+        <button id="btn-demo-try" class="btn-console-highlight btn-demo-try" aria-label="Demo Try" style="display: inline-flex;">Demo Try</button>
+        <button id="btn-live-switch" class="btn-console-secondary btn-live-switch" aria-label="Live" style="display: none;">Live</button>
       </div>
 
       <div class="readout-item">
@@ -223,19 +235,58 @@
     <div id="band-cards-grid" class="band-cards-grid" style="display: none;"></div>
   </section>
 
-  <!-- 4. Bottom Control Bar -->
+  <!-- 4. Bottom Control Bar: Professional Audio Console Frame -->
   <footer class="app-bottom-bar" aria-label="Station Controls">
+    <!-- Frame Hardware Registration Marks -->
+    <span class="audio-frame-reg frame-reg-tl" aria-hidden="true">+</span>
+    <span class="audio-frame-reg frame-reg-tr" aria-hidden="true">+</span>
+
     <div class="controls-left">
-      <!-- Tune In / Mute Button -->
+      <!-- Master Audio Unit Identity -->
+      <div class="audio-unit-badge-group" aria-hidden="true">
+        <span class="audio-unit-tag">DSP 01</span>
+        <span class="audio-unit-sep">/</span>
+        <span class="audio-dsp-spec">48kHz · 24b</span>
+      </div>
+
+      <!-- Tune In / Mute Button with Hardware Tally Lamp -->
       <button id="tune-btn" class="btn-console-primary" aria-pressed="false">
+        <span class="tally-led" aria-hidden="true"></span>
         <span id="tune-text">Tune in</span>
       </button>
 
-      <!-- Volume Hairline Slider -->
+      <!-- Real-Time Hardware LED VU / Peak Meter -->
+      <div class="audio-vu-meter-container" aria-label="Stereo Audio Level Meter" title="Real-time Audio VU Peak Meter (dBFS)">
+        <div class="vu-meter-header">
+          <span class="vu-meter-label">PEAK dBFS</span>
+          <span id="vu-peak-val" class="vu-peak-val">-∞ dB</span>
+        </div>
+        <div class="vu-meter-ladder" id="audio-vu-meter" aria-hidden="true">
+          <div class="vu-meter-track" id="vu-track-l">
+            <span class="vu-pip" data-db="-36"></span>
+            <span class="vu-pip" data-db="-28"></span>
+            <span class="vu-pip" data-db="-20"></span>
+            <span class="vu-pip" data-db="-14"></span>
+            <span class="vu-pip" data-db="-10"></span>
+            <span class="vu-pip" data-db="-6"></span>
+            <span class="vu-pip" data-db="-3"></span>
+            <span class="vu-pip" data-db="-1"></span>
+            <span class="vu-pip vu-amber" data-db="0"></span>
+            <span class="vu-pip vu-red" data-db="+3"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Volume Hairline Slider with Precision dB Readout -->
       <div class="volume-control-group">
         <button id="mute-btn" class="btn-console-secondary" style="padding: 0.35rem 0.6rem;" aria-label="Mute Audio">MUTE</button>
-        <label for="volume-slider" class="volume-label">VOL</label>
-        <input type="range" id="volume-slider" class="hairline-slider" min="0" max="1" step="0.01" value="0.75" aria-label="Volume">
+        <div class="vol-slider-wrapper">
+          <div class="vol-slider-header">
+            <label for="volume-slider" class="volume-label">VOL</label>
+            <span id="val-vol-db" class="vol-db-display">-2.5 dB</span>
+          </div>
+          <input type="range" id="volume-slider" class="hairline-slider" min="0" max="1" step="0.01" value="0.75" aria-label="Volume">
+        </div>
       </div>
     </div>
 
@@ -243,7 +294,7 @@
       <!-- Mode Triggers -->
       <button id="tab-replay" class="btn-console-secondary" aria-expanded="false">Replay day</button>
       <button id="tab-band" class="btn-console-secondary" aria-expanded="false">Band</button>
-      <button id="tab-live" style="display: none;">Live</button>
+      <button id="tab-live" class="btn-console-secondary" style="display: none;" aria-label="Live">Live</button>
       <button id="btn-open-console" class="btn-console-secondary" aria-expanded="false" title="Open Console Settings (C)">Console</button>
       <button id="btn-open-diag" class="btn-console-secondary" aria-expanded="false" title="System Diagnostics (D)">Diag</button>
 

@@ -62,6 +62,7 @@ export class LookAheadScheduler {
     this.strugglingDurationMs = 0;
     this.isStruggling = false;
     this.onBufferingStateChange = null;
+    this.onVoiceTriggered = null;
   }
 
   setPalette(palette) {
@@ -182,22 +183,26 @@ export class LookAheadScheduler {
       // Pad chord on downbeat of each bar (16 steps)
       if (stepInBar === 0 && this.activeVoices < this.maxPolyphony) {
         playPad(this.ctx, this.destination, time, currentChord, 3.2, 0.55 * masterGain);
+        if (this.onVoiceTriggered) this.onVoiceTriggered('HARMONY', 0.85);
       }
       // Counterpoint arpeggios on 8th notes
       if (stepInBar % 2 === 0 && this.activeVoices < this.maxPolyphony) {
         const chordNote = currentChord[Math.floor(stepInBar / 2) % currentChord.length];
         if (chordNote) {
           playPluck(this.ctx, this.destination, time, chordNote, 0.45, 0.5 * masterGain);
+          if (this.onVoiceTriggered) this.onVoiceTriggered('HARMONY', 0.6);
         }
       }
       // Subtle chamber chime on bar transitions
       if (stepInBar === 12 && prng() > 0.4 && this.activeVoices < this.maxPolyphony) {
         const highChime = (scaleFreqs[scaleFreqs.length - 2] || 880);
         playBell(this.ctx, this.destination, time, highChime, 2.8, 0.35 * masterGain);
+        if (this.onVoiceTriggered) this.onVoiceTriggered('BELL', 0.7);
       }
       // Gentle soft kick on beat 1 only
       if (stepInBar === 0) {
         playKick(this.ctx, this.destination, time, 0.5 * masterGain);
+        if (this.onVoiceTriggered) this.onVoiceTriggered('KICK', 0.6);
       }
     } else {
       switch (mood) {
@@ -206,6 +211,7 @@ export class LookAheadScheduler {
           // Pad chord every 2 bars (32 steps)
           if (step % 32 === 0 && this.activeVoices < this.maxPolyphony) {
             playPad(this.ctx, this.destination, time, currentChord, 4.0, 0.45 * masterGain);
+            if (this.onVoiceTriggered) this.onVoiceTriggered('PAD', 0.75);
           }
           // Sparse high bell chimes on deterministic probability
           if ((stepInBar === 0 || stepInBar === 6 || stepInBar === 12) && this.activeVoices < this.maxPolyphony) {
@@ -213,6 +219,7 @@ export class LookAheadScheduler {
               const highFreqs = scaleFreqs.slice(-6); // high octave
               const bellFreq = choose(prng, highFreqs) || 880;
               playBell(this.ctx, this.destination, time, bellFreq, 2.5, 0.35 * masterGain);
+              if (this.onVoiceTriggered) this.onVoiceTriggered('BELL', 0.8);
             }
           }
           break;
@@ -222,20 +229,24 @@ export class LookAheadScheduler {
           // Bar downbeat pad
           if (stepInBar === 0 && this.activeVoices < this.maxPolyphony) {
             playPad(this.ctx, this.destination, time, currentChord, 2.2, 0.35 * masterGain);
+            if (this.onVoiceTriggered) this.onVoiceTriggered('PAD', 0.65);
           }
           // Soft kick on beats 1 and 3 (steps 0 and 8)
           if (stepInBar === 0 || stepInBar === 8) {
             playKick(this.ctx, this.destination, time, 0.7 * masterGain);
+            if (this.onVoiceTriggered) this.onVoiceTriggered('KICK', 0.8);
           }
           // Off-beat hi-hat (steps 4 and 12)
           if (stepInBar % 4 === 2) {
             playHiHat(this.ctx, this.destination, time, false, 0.25 * masterGain);
+            if (this.onVoiceTriggered) this.onVoiceTriggered('BASS', 0.45);
           }
           // Plucked Dorian melody on 8th notes
           if (stepInBar % 2 === 0 && prng() > 0.25 && this.activeVoices < this.maxPolyphony) {
             const midFreqs = scaleFreqs.slice(3, 11);
             const noteFreq = choose(prng, midFreqs) || 440;
             playPluck(this.ctx, this.destination, time, noteFreq, 0.3, 0.45 * masterGain);
+            if (this.onVoiceTriggered) this.onVoiceTriggered('LEAD', 0.7);
           }
           break;
         }
@@ -244,19 +255,25 @@ export class LookAheadScheduler {
           // Pad chord on downbeat
           if (stepInBar === 0 && this.activeVoices < this.maxPolyphony) {
             playPad(this.ctx, this.destination, time, currentChord, 1.8, 0.3 * masterGain);
+            if (this.onVoiceTriggered) this.onVoiceTriggered('PAD', 0.6);
           }
           // Driving kick on every quarter note (beats 1, 2, 3, 4)
           if (stepInBar % 4 === 0) {
             playKick(this.ctx, this.destination, time, 0.85 * masterGain);
+            if (this.onVoiceTriggered) this.onVoiceTriggered('KICK', 0.95);
           }
           // Driving 16th-note hi-hat groove
           playHiHat(this.ctx, this.destination, time, stepInBar % 4 === 0, 0.25 * masterGain);
+          if (stepInBar % 4 === 2 && this.onVoiceTriggered) {
+            this.onVoiceTriggered('BASS', 0.5);
+          }
 
           // Fast arpeggiated Mixolydian lead
           if (prng() > 0.2 && this.activeVoices < this.maxPolyphony) {
             const leadFreqs = scaleFreqs.slice(4, 13);
             const leadFreq = choose(prng, leadFreqs) || 523.25;
             playLead(this.ctx, this.destination, time, leadFreq, 0.18, 0.4 * masterGain);
+            if (this.onVoiceTriggered) this.onVoiceTriggered('LEAD', 0.85);
           }
           break;
         }
@@ -266,6 +283,7 @@ export class LookAheadScheduler {
     // Schedule active NFT band voices if any exist
     const bandVoices = this.getBandVoices();
     if (bandVoices && bandVoices.length > 0) {
+      if (this.onVoiceTriggered) this.onVoiceTriggered('BAND', 0.85);
       bandVoices.forEach((voice) => {
         voice.scheduleStep(this.ctx, time, step, prng, scaleFreqs, masterGain);
       });

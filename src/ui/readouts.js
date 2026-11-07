@@ -33,7 +33,7 @@ export class ReadoutsManager {
     // 1. Mood
     if (this.elements.badgeMood) {
       this.elements.badgeMood.className = `readout-value mood-display ${mood}`;
-      this.elements.badgeMood.textContent = mood;
+      this.elements.badgeMood.textContent = mood.toUpperCase();
     }
 
     // 2. Rolling BPM & RPM

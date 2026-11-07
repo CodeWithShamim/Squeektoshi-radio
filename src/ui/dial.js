@@ -45,8 +45,9 @@ export class CentralDial {
     this.lastFrame = performance.now();
     this.canvasScale = 1.0;
 
-    // Callback on hour scrub
+    // Callbacks
     this.onHourSelect = options.onHourSelect || null;
+    this.onRenderFrame = options.onRenderFrame || null;
 
     this.initStructure();
     this.startLoop();
@@ -282,10 +283,10 @@ export class CentralDial {
     const center = 300;
 
     if (!this.analyser || !this.timeDomainBuffer) {
-      // Draw quiet hairline circle when audio is inactive
+      // Draw quiet phosphor hairline circle when audio is inactive
       this.ctx.beginPath();
       this.ctx.arc(center, center, baseRadius, 0, Math.PI * 2);
-      this.ctx.strokeStyle = 'rgba(233, 230, 220, 0.12)';
+      this.ctx.strokeStyle = 'rgba(91, 140, 255, 0.20)';
       this.ctx.lineWidth = 1;
       this.ctx.stroke();
       return;
@@ -302,7 +303,7 @@ export class CentralDial {
       const angle = (i / stride) * step;
       // Byte values range 0 to 255 (128 is center/silence)
       const amplitude = (this.timeDomainBuffer[i] - 128) / 128.0;
-      const modRadius = baseRadius + amplitude * 22;
+      const modRadius = baseRadius + amplitude * 24;
 
       const x = center + Math.cos(angle) * modRadius;
       const y = center + Math.sin(angle) * modRadius;
@@ -315,8 +316,8 @@ export class CentralDial {
     }
 
     this.ctx.closePath();
-    this.ctx.strokeStyle = this.mood === 'zoomies' ? 'rgba(255, 178, 62, 0.65)' : 'rgba(233, 230, 220, 0.35)';
-    this.ctx.lineWidth = 1.2;
+    this.ctx.strokeStyle = this.mood === 'zoomies' ? 'rgba(255, 178, 62, 0.85)' : 'rgba(91, 140, 255, 0.75)';
+    this.ctx.lineWidth = 1.6;
     this.ctx.stroke();
   }
 
@@ -352,6 +353,9 @@ export class CentralDial {
       }
 
       this.update(delta, now);
+      if (typeof this.onRenderFrame === 'function') {
+        this.onRenderFrame(delta, now);
+      }
       requestAnimationFrame(loop);
     };
 

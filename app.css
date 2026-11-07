@@ -33,6 +33,41 @@ body.app-body {
   overflow-x: hidden;
 }
 
+/* Background Oscilloscope Full-Bleed Canvas */
+.bg-waveform-canvas {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Screen Reader Only Utility */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.btn-cue-toggle {
+  padding: 0.2rem 0.5rem;
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+}
+
+.btn-cue-toggle[aria-pressed="false"] {
+  opacity: 0.5;
+  border-color: var(--color-hairline);
+  color: var(--color-bone-muted);
+}
+
 /* Subtle Hairline Grid Overlay */
 .app-grid-lines {
   position: fixed;
@@ -275,6 +310,13 @@ body.app-body {
 .readout-value.mood-display.zoomies { color: var(--color-amber); }
 .readout-value.mood-display.unknown { color: var(--color-bone-muted); text-decoration: underline dotted; }
 
+.readout-item-mood {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: flex-start;
+}
+
 /* Center Hero Dial (Cols 4 - 9) */
 .dial-stage-center {
   grid-column: 4 / 10;
@@ -374,9 +416,9 @@ body.app-body {
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* 4. Bottom Control Bar */
+/* 4. Bottom Control Bar: Professional Audio Console Frame */
 .app-bottom-bar {
-  border-top: 1px solid var(--color-hairline);
+  border-top: 1px solid rgba(91, 140, 255, 0.22);
   padding: 0 var(--page-margin);
   height: var(--bottom-bar-height);
   display: flex;
@@ -385,13 +427,166 @@ body.app-body {
   gap: 2rem;
   position: relative;
   z-index: 20;
-  background-color: var(--color-ink);
+  background-color: #0b0b0f;
+  box-shadow: 0 -2px 16px rgba(0, 0, 0, 0.45);
+}
+
+/* Audio Frame Corner Registration Marks (+) */
+.audio-frame-reg {
+  position: absolute;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: rgba(91, 140, 255, 0.4);
+  pointer-events: none;
+  line-height: 1;
+}
+
+.frame-reg-tl {
+  top: 4px;
+  left: 8px;
+}
+
+.frame-reg-tr {
+  top: 4px;
+  right: 8px;
 }
 
 .controls-left, .controls-right {
   display: flex;
   align-items: center;
-  gap: 1.75rem;
+  gap: 1.25rem;
+}
+
+/* Master Audio DSP Unit Tag */
+.audio-unit-badge-group {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  letter-spacing: 0.1em;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid rgba(91, 140, 255, 0.22);
+  background-color: rgba(11, 11, 14, 0.85);
+  color: var(--color-blue);
+  white-space: nowrap;
+}
+
+.audio-unit-tag {
+  color: var(--color-amber);
+  font-weight: 600;
+}
+
+.audio-unit-sep {
+  color: rgba(233, 230, 220, 0.25);
+}
+
+.audio-dsp-spec {
+  color: var(--color-bone-muted);
+}
+
+/* Tally Lamp on Tune Button */
+.tally-led {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: rgba(233, 230, 220, 0.25);
+  margin-right: 0.45rem;
+  vertical-align: middle;
+  transition: background-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.btn-console-primary.active-tune .tally-led,
+.btn-console-primary.playing .tally-led {
+  background-color: var(--color-amber);
+  box-shadow: 0 0 6px var(--color-amber);
+}
+
+/* Real-Time Hardware LED VU / Peak Meter */
+.audio-vu-meter-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.25rem 0.6rem;
+  border: 1px solid rgba(233, 230, 220, 0.12);
+  background-color: rgba(11, 11, 14, 0.9);
+  min-width: 118px;
+}
+
+.vu-meter-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.08em;
+  color: var(--color-bone-subtle);
+}
+
+.vu-peak-val {
+  color: var(--color-blue);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.62rem;
+  font-weight: 600;
+}
+
+.vu-meter-ladder {
+  display: flex;
+  flex-direction: column;
+}
+
+.vu-meter-track {
+  display: flex;
+  gap: 2px;
+  height: 6px;
+  align-items: center;
+}
+
+.vu-pip {
+  flex: 1;
+  height: 100%;
+  background-color: rgba(233, 230, 220, 0.08);
+  border-radius: 0.5px;
+  transition: background-color 0.04s ease;
+}
+
+.vu-pip.lit {
+  background-color: var(--color-blue);
+  box-shadow: 0 0 3px rgba(91, 140, 255, 0.5);
+}
+
+.vu-pip.vu-amber.lit {
+  background-color: var(--color-amber);
+  box-shadow: 0 0 4px rgba(255, 178, 62, 0.6);
+}
+
+.vu-pip.vu-red.lit {
+  background-color: #ff5555;
+  box-shadow: 0 0 5px rgba(255, 85, 85, 0.8);
+}
+
+/* Volume Slider Wrapper & Calibrated dB Display */
+.vol-slider-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.vol-slider-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+}
+
+.vol-db-display {
+  color: var(--color-amber);
+  font-size: 0.62rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+  font-weight: 600;
 }
 
 /* Primary Tune in / Mute Button */
@@ -441,6 +636,104 @@ body.app-body {
   color: var(--color-bone);
   border-color: var(--color-bone-muted);
   outline: none;
+}
+
+/* Highlight Button (Demo Try) */
+.btn-console-highlight,
+.btn-demo-try {
+  background-color: #18140c;
+  color: var(--color-amber);
+  border: 1px solid var(--color-amber);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 0.38rem 0.85rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  box-shadow: 0 0 10px rgba(255, 178, 62, 0.25);
+  animation: pulse-amber-glow 2.4s ease-in-out infinite;
+  transition: background-color var(--duration-short) var(--ease-motion),
+              color var(--duration-short) var(--ease-motion),
+              box-shadow var(--duration-short) var(--ease-motion),
+              border-color var(--duration-short) var(--ease-motion);
+  user-select: none;
+  z-index: 2;
+}
+
+.btn-console-highlight:hover,
+.btn-console-highlight:focus-visible,
+.btn-demo-try:hover,
+.btn-demo-try:focus-visible {
+  background-color: var(--color-amber);
+  color: var(--color-ink);
+  box-shadow: 0 0 18px rgba(255, 178, 62, 0.6);
+  outline: none;
+}
+
+.btn-header-demo {
+  padding: 0.3rem 0.65rem;
+  font-size: 0.7rem;
+}
+
+.btn-header-console {
+  padding: 0.3rem 0.7rem;
+  font-size: 0.7rem;
+}
+
+/* Live Mode Switch Button */
+.btn-live-switch,
+.btn-header-live {
+  background-color: #121217;
+  color: var(--color-bone);
+  border: 1px solid var(--color-hairline-bright);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 0.38rem 0.85rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  transition: color var(--duration-short) var(--ease-motion),
+              border-color var(--duration-short) var(--ease-motion),
+              background-color var(--duration-short) var(--ease-motion),
+              box-shadow var(--duration-short) var(--ease-motion);
+  user-select: none;
+  z-index: 2;
+}
+
+.btn-header-live {
+  padding: 0.3rem 0.7rem;
+  font-size: 0.7rem;
+}
+
+.btn-live-switch:hover,
+.btn-live-switch:focus-visible,
+.btn-header-live:hover,
+.btn-header-live:focus-visible {
+  color: #fff;
+  border-color: var(--color-blue);
+  background-color: rgba(91, 140, 255, 0.18);
+  box-shadow: 0 0 10px rgba(91, 140, 255, 0.35);
+  outline: none;
+}
+
+@keyframes pulse-amber-glow {
+  0%, 100% {
+    box-shadow: 0 0 8px rgba(255, 178, 62, 0.2);
+    border-color: var(--color-amber);
+  }
+  50% {
+    box-shadow: 0 0 18px rgba(255, 178, 62, 0.6);
+    border-color: #ffd07d;
+  }
 }
 
 /* Volume Slider */
@@ -717,6 +1010,10 @@ body.overlay-mode .overlay-now-playing {
   .entry-sweep-line {
     display: none !important;
   }
+  .btn-console-highlight,
+  .btn-demo-try {
+    animation: none !important;
+  }
 }
 
 /* 7. Mobile Responsive (360px - 768px) */
@@ -724,6 +1021,17 @@ body.overlay-mode .overlay-now-playing {
   :root {
     --page-margin: 1.25rem;
     --bottom-bar-height: auto;
+  }
+
+  .header-right {
+    gap: 0.6rem;
+  }
+
+  .btn-header-console,
+  .btn-header-demo,
+  .btn-header-live {
+    padding: 0.35rem 0.6rem;
+    font-size: 0.68rem;
   }
   
   .console-container {

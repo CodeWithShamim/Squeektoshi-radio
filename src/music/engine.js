@@ -38,6 +38,7 @@ export class AudioEngine {
     this.latestTelemetry = null;
     this.bandVoices = [];
     this.onBufferingStateChange = null;
+    this.onVoiceTriggered = null;
   }
 
   /**
@@ -132,6 +133,11 @@ export class AudioEngine {
     this.scheduler.onBufferingStateChange = (struggling, lateness) => {
       if (this.onBufferingStateChange) {
         this.onBufferingStateChange(struggling, lateness);
+      }
+    };
+    this.scheduler.onVoiceTriggered = (layer, intensity) => {
+      if (this.onVoiceTriggered) {
+        this.onVoiceTriggered(layer, intensity);
       }
     };
 
